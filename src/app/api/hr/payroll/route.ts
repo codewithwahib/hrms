@@ -1,80 +1,217 @@
-// src/app/api/hr/payroll/route.ts
+// app/api/hr/payroll/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export async function POST(request: NextRequest) {
+// =====================================================
+// POST → Insert payroll record
+// =====================================================
+export async function POST(req: NextRequest) {
   try {
-    const b = await request.json()
+    const body = await req.json()
 
-    const row = {
-      employee_id: b.employeeId,
-      name: b.name,
-      designation: b.designation,
-      cnic: b.cnic,
+    // Basic validation
+    if (!body.employee_id) {
+      return NextResponse.json(
+        { error: 'employee_id is required' },
+        { status: 400 }
+      )
+    }
+    if (!body.month_year) {
+      return NextResponse.json(
+        { error: 'month_year is required' },
+        { status: 400 }
+      )
+    }
 
-      total_increase: b.totalIncrease ?? 0,
-      gross: b.gross ?? 0,
-      total_gross_after_increa: b.totalGrossAfterIncrease ?? 0,
+    // Ensure numeric fields are numbers (avoid NaN / null errors)
+    const numericFields = [
+      'total_increase', 'gross', 'total_gross_after_increa', 'basic_salary',
+      'per_month_salary', 'per_day', 'present_amount', 'absent_amount',
+      'duty_hours', 'pr_hours', 'total_month_hours', 'late_hours',
+      'late_hour_amount', 'salary_exp', 'over_time_hour', 'over_time',
+      'hold_salary', 'deduct_health_insurance', 'total_salary', 'loan',
+      'adv_salary', 'income_tax', 'net_salary_payable'
+    ]
+    const intFields = [
+      'present_day', 'absent_day', 'approvl_lvn',
+      'total_salary_days', 'approvl_lvn_2'
+    ]
 
-      basic_salary: b.basicSalary ?? 0,
-      per_month_salary: b.perMonthSalary ?? 0,
-      per_day: b.perDay ?? 0,
+    const payload: any = {
+      employee_id: String(body.employee_id).trim(),
+      name: body.name || '',
+      designation: body.designation || '',
+      cnic: body.cnic || '',
+      month_year: body.month_year
+    }
 
-      present_day: b.presentDay ?? 0,
-      present_amount: b.presentAmount ?? 0,
-      absent_day: b.absentDay ?? 0,
-      absent_amount: b.absentAmount ?? 0,
-      approvl_lvn: b.approvlLvn ?? 0,
-      total_salary_days: b.totalSalaryDays ?? 0,
-
-      duty_hours: b.dutyHours ?? 8,
-      pr_hours: b.prHours ?? 0,
-      total_month_hours: b.totalMonthHours ?? 0,
-
-      late_hours: b.lateHours ?? 0,
-      late_hour_amount: b.lateHourAmount ?? 0,
-      salary_exp: b.salaryExp ?? 0,
-
-      approvl_lvn_2: b.approvlLvn2 ?? 0,
-      over_time_hour: b.overTimeHour ?? 0,
-      over_time: b.overTime ?? 0,
-
-      hold_salary: b.holdSalary ?? 0,
-      deduct_health_insurance: b.deductHealthInsurance ?? 0,
-      total_salary: b.totalSalary ?? 0,
-
-      loan: b.loan ?? 0,
-      adv_salary: b.advSalary ?? 0,
-      income_tax: b.incomeTax ?? 0,
-      net_salary_payable: b.netSalaryPayable ?? 0,
-
-      month_year: b.monthYear,
+    for (const key of numericFields) {
+      payload[key] = Number.isFinite(Number(body[key])) ? Number(body[key]) : 0
+    }
+    for (const key of intFields) {
+      payload[key] = Number.isFinite(Number(body[key])) ? Math.trunc(Number(body[key])) : 0
     }
 
     const { data, error } = await supabase
       .from('payroll')
-      .insert([row])
+      .insert([payload])
       .select()
+      .single()
 
     if (error) {
+      console.error('Supabase insert error:', error)
       return NextResponse.json(
-        { success: false, error: error.message },
+        { error: error.message, details: error.details, hint: error.hint },
         { status: 500 }
       )
     }
 
-    return NextResponse.json({ success: true, payroll: data?.[0] })
-  } catch (err) {
     return NextResponse.json(
-      {
-        success: false,
-        error: err instanceof Error ? err.message : 'Failed to save',
-      },
+      { success: true, message: 'Payroll submitted successfully', data },
+      { status: 201 }
+    )
+  } catch (err: any) {
+    console.error('API payroll POST error:', err)
+    return NextResponse.json(
+      { error: err.message || 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// =====================================================
+// GET → Fetch payroll records (optional filter)
+// =====================================================
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const employeeId = searchParams.get('employee_id')
+    const monthYear = searchParams.get('month_year')
+
+    let query = supabase
+      .from('payroll')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (employeeId) query = query.eq('employee_id', employeeId)
+    if (monthYear) query = query.eq('month_year', monthYear)
+
+    const { data, error } = await query
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, data }, { status: 200 })
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// =====================================================
+// PUT → Update payroll record by id
+// =====================================================
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json()
+
+    if (!body.id) {
+      return NextResponse.json(
+        { error: 'id is required for update' },
+        { status: 400 }
+      )
+    }
+
+    const numericFields = [
+      'total_increase', 'gross', 'total_gross_after_increa', 'basic_salary',
+      'per_month_salary', 'per_day', 'present_amount', 'absent_amount',
+      'duty_hours', 'pr_hours', 'total_month_hours', 'late_hours',
+      'late_hour_amount', 'salary_exp', 'over_time_hour', 'over_time',
+      'hold_salary', 'deduct_health_insurance', 'total_salary', 'loan',
+      'adv_salary', 'income_tax', 'net_salary_payable'
+    ]
+    const intFields = [
+      'present_day', 'absent_day', 'approvl_lvn',
+      'total_salary_days', 'approvl_lvn_2'
+    ]
+
+    const payload: any = { updated_at: new Date().toISOString() }
+
+    if (body.name !== undefined) payload.name = body.name
+    if (body.designation !== undefined) payload.designation = body.designation
+    if (body.cnic !== undefined) payload.cnic = body.cnic
+    if (body.month_year !== undefined) payload.month_year = body.month_year
+
+    for (const key of numericFields) {
+      if (body[key] !== undefined) {
+        payload[key] = Number.isFinite(Number(body[key])) ? Number(body[key]) : 0
+      }
+    }
+    for (const key of intFields) {
+      if (body[key] !== undefined) {
+        payload[key] = Number.isFinite(Number(body[key])) ? Math.trunc(Number(body[key])) : 0
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('payroll')
+      .update(payload)
+      .eq('id', body.id)
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(
+      { success: true, message: 'Payroll updated', data },
+      { status: 200 }
+    )
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// =====================================================
+// DELETE → Delete payroll record by id
+// =====================================================
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 })
+    }
+
+    const { error } = await supabase
+      .from('payroll')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(
+      { success: true, message: 'Payroll deleted' },
+      { status: 200 }
+    )
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || 'Internal server error' },
       { status: 500 }
     )
   }

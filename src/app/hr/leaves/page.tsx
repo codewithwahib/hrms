@@ -2080,23 +2080,23 @@ export default function HRLeaveManagementPage() {
                               </h4>
 
                               <div className="space-y-2 text-sm tracking-wide">
-                                <div className="flex justify-between">
+                                <div className="flex text-gray-700 justify-between">
                                   <span className="text-gray-500">Leave Type:</span>
                                   <span className="font-medium">{leave.leaveType || 'N/A'}</span>
                                 </div>
-                                <div className="flex justify-between">
+                                <div className="flex text-gray-700 justify-between">
                                   <span className="text-gray-500">From:</span>
                                   <span>{formatDate(leave.fromDate)}</span>
                                 </div>
-                                <div className="flex justify-between">
+                                <div className="flex text-gray-700 justify-between">
                                   <span className="text-gray-500">To:</span>
                                   <span>{formatDate(leave.toDate)}</span>
                                 </div>
-                                <div className="flex justify-between">
+                                <div className="flex text-gray-700 justify-between">
                                   <span className="text-gray-500">Total Days:</span>
                                   <span className="font-medium">{days}</span>
                                 </div>
-                                <div className="flex justify-between">
+                                <div className="flex text-gray-700 justify-between">
                                   <span className="text-gray-500">Applied On:</span>
                                   <span className="text-xs text-gray-400">
                                     {formatDateTime(leave.appliedOn)}
