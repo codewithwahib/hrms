@@ -196,18 +196,15 @@ const getShiftDisplay = (shiftTiming: string | null | undefined, _shift?: string
   return to12HourFormat(raw)
 }
 
-// ✅ NEW: shift timing se total shift hours calculate karo
-//    Input: "09:00 - 18:00" (24h) ya "09:00 AM - 06:00 PM" (12h)
-//    Output: 9 (hours) ya 8 ya jo bhi shift duration ho
+// ✅ shift timing se total shift hours calculate karo
 const getShiftTotalHours = (shiftTiming: string | null | undefined): number => {
-  if (!shiftTiming) return 8 // default 8 hours
+  if (!shiftTiming) return 8
   const raw = String(shiftTiming).trim()
   const parts = raw.split(/\s*-\s*/)
   if (parts.length !== 2) return 8
 
   const parseTime = (t: string): number => {
     const trimmed = t.trim().toUpperCase()
-    // 12-hour format check
     const ampmMatch = trimmed.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/)
     if (ampmMatch) {
       let h = parseInt(ampmMatch[1])
@@ -217,7 +214,6 @@ const getShiftTotalHours = (shiftTiming: string | null | undefined): number => {
       if (ampm === 'AM' && h === 12) h = 0
       return h * 60 + m
     }
-    // 24-hour format
     const match24 = trimmed.match(/^(\d{1,2}):(\d{2})/)
     if (match24) {
       return parseInt(match24[1]) * 60 + parseInt(match24[2])
@@ -230,9 +226,24 @@ const getShiftTotalHours = (shiftTiming: string | null | undefined): number => {
   if (startMin < 0 || endMin < 0) return 8
 
   let diffMin = endMin - startMin
-  if (diffMin < 0) diffMin += 24 * 60  // overnight shift
+  if (diffMin < 0) diffMin += 24 * 60
 
   return diffMin / 60
+}
+
+// ✅ Convert ISO timestamp → local YYYY-MM-DD
+const toLocalDateStr = (isoTimestamp: string): string => {
+  if (!isoTimestamp) return ''
+  try {
+    const d = new Date(isoTimestamp)
+    if (isNaN(d.getTime())) return ''
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  } catch {
+    return ''
+  }
 }
 
 export default function GetSheetPage() {
@@ -248,7 +259,7 @@ export default function GetSheetPage() {
   const [filteredData, setFilteredData] = useState<AttendanceRecord[]>([])
   const [expandedFilters, setExpandedFilters] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all')
-  const [employeeNames, setEmployeeNames] = useState<{id: string, name: string, department: string, source: string}[]>([])
+  const [employeeNames, setEmployeeNames] = useState<{ id: string, name: string, department: string, source: string }[]>([])
   const [showPrintOptions, setShowPrintOptions] = useState(false)
   const [dataSource, setDataSource] = useState<{ K: number; PQ: number }>({ K: 0, PQ: 0 })
 
@@ -385,15 +396,6 @@ export default function GetSheetPage() {
     return experience.map(exp => `${exp.position} at ${exp.company}`).join('; ')
   }, [])
 
-  const isValidCoordinate = useCallback((location: string): boolean => {
-    if (!location || location === '-') return false
-    const parts = location.split(',').map(s => s.trim())
-    if (parts.length !== 2) return false
-    const lat = parseFloat(parts[0])
-    const lng = parseFloat(parts[1])
-    return !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
-  }, [])
-
   const parseCoordinates = useCallback((location: string): { lat: number; lng: number } | null => {
     if (!location || location === '-') return null
     const parts = location.split(',').map(s => s.trim())
@@ -462,8 +464,10 @@ export default function GetSheetPage() {
     }
 
     const dayLogs = logs.filter(log => {
-      const logDate = log.timestamp.split('T')[0]
-      return logDate === dateStr && log.user_id === employee.employee_id
+      const logDate = toLocalDateStr(log.timestamp)
+      const logUserId = String(log.user_id).trim()
+      const empId = String(employee.employee_id).trim()
+      return logDate === dateStr && logUserId === empId
     })
 
     const sortedLogs = [...dayLogs].sort(
@@ -523,11 +527,11 @@ export default function GetSheetPage() {
     let outsideCheckOutTime = ''
 
     if (employee.check_in && employee.check_in.length > 0) {
-      const checkInJson = employee.check_in.find(c => c.time.split('T')[0] === dateStr)
+      const checkInJson = employee.check_in.find(c => toLocalDateStr(c.time) === dateStr)
       if (checkInJson) outsideCheckInTime = checkInJson.time
     }
     if (employee.check_out && employee.check_out.length > 0) {
-      const checkOutJson = employee.check_out.find(c => c.time.split('T')[0] === dateStr)
+      const checkOutJson = employee.check_out.find(c => toLocalDateStr(c.time) === dateStr)
       if (checkOutJson) outsideCheckOutTime = checkOutJson.time
     }
 
@@ -546,7 +550,7 @@ export default function GetSheetPage() {
 
     let source = employee.source || 'K'
     if (!employee.source) {
-      source = checkInLog?.source || checkOutLog?.source || 'K'
+      source = (checkInLog?.source || checkOutLog?.source || 'K') as 'K' | 'PQ'
     }
 
     return {
@@ -619,7 +623,11 @@ export default function GetSheetPage() {
   }, [])
 
   // =====================================================
-  // fetchData
+  // fetchData — FINAL FIX
+  //   ✅ Pagination (1000-row Supabase limit handle)
+  //   ✅ K logs: .in() with employee IDs
+  //   ✅ PQ logs: NO .in() — fetch all, filter client-side
+  //   ✅ String-safe user_id comparison
   // =====================================================
 
   const fetchData = useCallback(async () => {
@@ -628,55 +636,225 @@ export default function GetSheetPage() {
       setLoading(true)
       setError(null)
 
+      // ---------------------------------------------------
+      // 1. Fetch employees
+      // ---------------------------------------------------
       const { data: employeeData, error: employeeError } = await supabase
-        .from('employees').select('*').order('full_name', { ascending: true })
+        .from('employees')
+        .select('*')
+        .order('full_name', { ascending: true })
 
       if (employeeError) throw new Error(employeeError.message)
+
       if (!employeeData || employeeData.length === 0) {
         setError('No employees found')
         setEmployees([])
         setDepartments([])
+        setEmployeeNames([])
+        setAttendanceLogs([])
+        setDataSource({ K: 0, PQ: 0 })
         setLoading(false)
         return
       }
 
-      const employeeIds = employeeData.map((e: any) => e.employee_id)
+      // ---------------------------------------------------
+      // 2. Build employee ID Set (string, trimmed)
+      // ---------------------------------------------------
+      const employeeIdSet = new Set<string>(
+        employeeData
+          .map((e: any) => String(e.employee_id ?? '').trim())
+          .filter(Boolean)
+      )
 
-      const [mainLogsResult, pqLogsResult] = await Promise.all([
-        supabase.from('attendance_logs').select('*').in('user_id', employeeIds).order('timestamp', { ascending: true }),
-        supabase.from('pq_attendance_logs').select('*').in('user_id', employeeIds).order('timestamp', { ascending: true })
+      const employeeIdsArray = Array.from(employeeIdSet)
+
+      console.log('======================================')
+      console.log('👥 Employees:', employeeData.length)
+      console.log('🆔 Unique IDs:', employeeIdsArray.length)
+      console.log('🆔 Sample IDs:', employeeIdsArray.slice(0, 20))
+      console.log('======================================')
+
+      // ---------------------------------------------------
+      // 3. Paginated fetch helper
+      // ---------------------------------------------------
+      const PAGE_SIZE = 1000
+
+      const fetchAllRows = async (
+        tableName: 'attendance_logs' | 'pq_attendance_logs',
+        applyEmployeeFilter: boolean
+      ): Promise<any[]> => {
+        let all: any[] = []
+        let from = 0
+        const MAX_PAGES = 200
+
+        for (let page = 0; page < MAX_PAGES; page++) {
+          let query = supabase
+            .from(tableName)
+            .select('*')
+            .order('timestamp', { ascending: true })
+            .range(from, from + PAGE_SIZE - 1)
+
+          if (applyEmployeeFilter) {
+            query = query.in('user_id', employeeIdsArray)
+          }
+
+          const { data, error } = await query
+
+          if (error) {
+            throw new Error(`${tableName}: ${error.message}`)
+          }
+
+          if (!data || data.length === 0) break
+
+          all = all.concat(data)
+
+          console.log(
+            `📡 ${tableName}: +${data.length} rows (total ${all.length})`
+          )
+
+          if (data.length < PAGE_SIZE) break
+
+          from += PAGE_SIZE
+        }
+
+        return all
+      }
+
+      // ---------------------------------------------------
+      // 4. Fetch K + PQ in parallel
+      // ---------------------------------------------------
+      console.log('📡 Fetching K logs (filtered by employee IDs)...')
+      console.log('📡 Fetching ALL PQ logs (no .in() filter)...')
+
+      const [mainLogsData, pqLogsData] = await Promise.all([
+        fetchAllRows('attendance_logs', true),
+        fetchAllRows('pq_attendance_logs', false)
       ])
 
+      console.log('✅ K fetched:', mainLogsData.length)
+      console.log('✅ PQ fetched:', pqLogsData.length)
+
+      // ---------------------------------------------------
+      // 5. Build allLogs
+      // ---------------------------------------------------
       const allLogs: AttendanceLog[] = []
 
-      if (mainLogsResult.data) {
-        allLogs.push(...mainLogsResult.data.map((log: any) => ({
-          ...log, punch_type: log.punch_type as 'CHECK_IN' | 'CHECK_OUT' | null, source: 'K' as 'K'
-        })))
-      }
-      if (pqLogsResult.data) {
-        allLogs.push(...pqLogsResult.data.map((log: any) => ({
-          ...log, punch_type: log.punch_type as 'CHECK_IN' | 'CHECK_OUT' | null, source: 'PQ' as 'PQ'
-        })))
-      }
-      allLogs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      // 5a. K logs
+      mainLogsData.forEach((log: any) => {
+        const uid = String(log.user_id ?? '').trim()
+        if (!employeeIdSet.has(uid)) return
 
+        allLogs.push({
+          id: Number(log.id),
+          user_id: uid,
+          employee_name: String(log.employee_name ?? ''),
+          timestamp: log.timestamp,
+          punch_type:
+            log.punch_type === 'CHECK_OUT'
+              ? 'CHECK_OUT'
+              : log.punch_type === 'CHECK_IN'
+                ? 'CHECK_IN'
+                : null,
+          device_id: String(log.device_id ?? ''),
+          branch_code: String(log.branch_code ?? 'K'),
+          raw_log_key: String(log.raw_log_key ?? ''),
+          created_at: log.created_at,
+          source: 'K'
+        })
+      })
+
+      // 5b. PQ logs
+      pqLogsData.forEach((log: any) => {
+        const uid = String(log.user_id ?? '').trim()
+        if (!employeeIdSet.has(uid)) return
+
+        allLogs.push({
+          id: Number(log.id),
+          user_id: uid,
+          employee_name: String(log.employee_name ?? ''),
+          timestamp: log.timestamp,
+          punch_type:
+            log.punch_type === 'CHECK_OUT'
+              ? 'CHECK_OUT'
+              : log.punch_type === 'CHECK_IN'
+                ? 'CHECK_IN'
+                : null,
+          device_id: String(log.device_id ?? ''),
+          branch_code: String(log.branch_code ?? 'PQ'),
+          raw_log_key: String(log.raw_log_key ?? ''),
+          created_at: log.created_at,
+          source: 'PQ'
+        })
+      })
+
+      // ---------------------------------------------------
+      // 6. Sort
+      // ---------------------------------------------------
+      allLogs.sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() -
+          new Date(b.timestamp).getTime()
+      )
+
+      // ---------------------------------------------------
+      // 7. Counts
+      // ---------------------------------------------------
+      const kCount = allLogs.filter(l => l.source === 'K').length
+      const pqCount = allLogs.filter(l => l.source === 'PQ').length
+
+      console.log('======================================')
+      console.log('📊 FINAL LOG COUNTS')
+      console.log('   K  :', kCount)
+      console.log('   PQ :', pqCount)
+      console.log('   TOT:', allLogs.length)
+      console.log('======================================')
+
+      // ---------------------------------------------------
+      // 8. Attach source to each employee
+      // ---------------------------------------------------
       const employeesWithSource = employeeData.map((emp: any) => {
-        const hasPQLogs = allLogs.some(log => log.user_id === emp.employee_id && log.source === 'PQ')
-        const hasMainLogs = allLogs.some(log => log.user_id === emp.employee_id && log.source === 'K')
+        const empId = String(emp.employee_id ?? '').trim()
+
+        const hasPQLogs = allLogs.some(
+          log => log.user_id === empId && log.source === 'PQ'
+        )
+        const hasMainLogs = allLogs.some(
+          log => log.user_id === empId && log.source === 'K'
+        )
+
         let source: 'K' | 'PQ' = 'K'
         if (hasPQLogs) source = 'PQ'
         else if (hasMainLogs) source = 'K'
-        return { ...emp, source }
+        else if (emp.source === 'PQ') source = 'PQ'
+        else if (emp.source === 'K') source = 'K'
+
+        return { ...emp, employee_id: empId, source }
       })
 
-      setDataSource({
-        K: mainLogsResult.data?.length || 0,
-        PQ: pqLogsResult.data?.length || 0
-      })
+      // ---------------------------------------------------
+      // 9. Update state
+      // ---------------------------------------------------
+      setDataSource({ K: kCount, PQ: pqCount })
 
-      setDepartments([...new Set(employeesWithSource.map((e: any) => e.department).filter(Boolean))] as string[])
-      setBranches([...new Set(employeesWithSource.map((e: any) => e.source).filter(Boolean))] as string[])
+      setDepartments(
+        [
+          ...new Set(
+            employeesWithSource
+              .map((e: any) => e.department)
+              .filter(Boolean)
+          )
+        ] as string[]
+      )
+
+      setBranches(
+        [
+          ...new Set(
+            employeesWithSource
+              .map((e: any) => e.source)
+              .filter(Boolean)
+          )
+        ] as string[]
+      )
 
       setEmployeeNames(
         employeesWithSource
@@ -692,10 +870,14 @@ export default function GetSheetPage() {
       setEmployees(employeesWithSource)
       setAttendanceLogs(allLogs)
       setLoading(false)
-    } catch (err) {
-      console.error('Error fetching data:', err)
-      setError('Failed to load data')
-      setLoading(false)
+
+      console.log('🎉 Attendance data loaded successfully.')
+    } catch (err: any) {
+      console.error('❌ Attendance fetch error:', err)
+      if (isMounted.current) {
+        setError(err?.message || 'Failed to load attendance data')
+        setLoading(false)
+      }
     }
   }, [])
 
@@ -737,7 +919,7 @@ export default function GetSheetPage() {
     const absent = filteredData.filter(r => r.status === 'Absent').length
     const leave = filteredData.filter(r => r.status === 'Leave').length
     const halfDay = filteredData.filter(r => r.status === 'Half Day').length
-    const off = filteredData.filter(r => r.status === 'Off').length
+    const off = filteredData.filter(r => r.status === 'Off').length    
     return { total, present, absent, leave, halfDay, off }
   }, [filteredData])
 
@@ -927,11 +1109,7 @@ export default function GetSheetPage() {
   }, [filteredData, selectedEmployee, selectedDepartment, selectedBranch, getSelectedEmployeeName, getRowColor, fromDate, toDate, formatDateForDisplay])
 
   // =====================================================
-  // ✅ Monthly Summary Calculator — SHIFT-BASED LATE HOURS
-  //    Rule:
-  //    - Late = shift timing ke total hours se kam kaam
-  //    - OT = shift timing se zyada kaam
-  //    - Present/Absent/Leave previous rules
+  // Monthly Summary Calculator — SHIFT-BASED LATE HOURS
   // =====================================================
 
   const calculateMonthlySummaries = useCallback((): MonthlySummary[] => {
@@ -968,7 +1146,6 @@ export default function GetSheetPage() {
       let lateHoursTotal = 0
       let overtimeHoursTotal = 0
 
-      // ✅ Shift se expected hours nikalo (e.g. "09:00 - 18:00" = 9)
       const shiftHours = getShiftTotalHours(first.shiftTiming)
 
       records.forEach(r => {
@@ -976,7 +1153,6 @@ export default function GetSheetPage() {
         else if (r.status === 'Leave') approvedLeaves += 1
         else presentDays += 1
 
-        // ✅ Late / OT calculate (working days only)
         if (
           r.day !== 'Sunday' &&
           r.status !== 'Off' &&
@@ -985,12 +1161,10 @@ export default function GetSheetPage() {
         ) {
           const workedHours = parseHoursToDecimal(r.totalHoursWithOS)
 
-          // ✅ Late = shift hours se kam kaam
           if (workedHours > 0 && workedHours < shiftHours) {
             lateHoursTotal += (shiftHours - workedHours)
           }
 
-          // ✅ OT = shift hours se zyada kaam
           if (workedHours > shiftHours) {
             overtimeHoursTotal += (workedHours - shiftHours)
           }
