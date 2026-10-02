@@ -71,8 +71,17 @@
 // // =====================================================
 // // Helpers
 // // =====================================================
-// const round2 = (n: number) => (!Number.isFinite(n) ? 0 : Math.round(n))
-// const fmt = (n: number) => round2(n ?? 0).toString()
+// // ✅ Keep original decimal values (round only floating point artifacts)
+// const round2 = (n: number) => {
+//   if (!Number.isFinite(n)) return 0
+//   return Math.round((n + Number.EPSILON) * 100) / 100
+// }
+
+// // ✅ Display with 2 decimal places (keeps original decimals)
+// const fmt = (n: number) => round2(n ?? 0).toFixed(2)
+
+// // ✅ Round off late hours (remove decimal part)
+// const roundLateHours = (n: number) => (!Number.isFinite(n) ? 0 : Math.floor(n))
 
 // const calcDaysBetween = (fromDate: string, toDate: string): number => {
 //   if (!fromDate || !toDate) return 0
@@ -199,30 +208,33 @@
 //         const emp = empMap.get(sheet.user_id)
 //         const empGross = Number(emp?.gross_salary) || 0
 //         const empBasic = Number(emp?.basic_salary) || 0
-//         const basicSalary = empBasic > 0 ? empBasic : round2(empGross / 2)
+//         const basicSalary = empBasic > 0 ? empBasic : empGross / 2
 
 //         const totalMonthDays = Number(sheet.total_month_days) || calcDaysBetween(fromDate, toDate)
-//         const perMonthSalary = round2(basicSalary / totalMonthDays)
-//         const perDay = round2((basicSalary / totalMonthDays) * 2)
+//         // ✅ Keep decimals — do NOT round to whole numbers
+//         const perMonthSalary = totalMonthDays > 0 ? basicSalary / totalMonthDays : 0
+//         const perDay = totalMonthDays > 0 ? (basicSalary / totalMonthDays) * 2 : 0
 //         const presentDay = Number(sheet.total_present) || 0
 //         const absentDay = Number(sheet.total_absent) || 0
 //         const approvlLvn = Number(sheet.approved_leaves) || 0
-//         const lateHours = Number(sheet.late_hours) || 0
+//         // ✅ Round off late hours (remove decimal part)
+//         const lateHours = roundLateHours(Number(sheet.late_hours) || 0)
 //         const overTimeHour = Number(sheet.overtime_hours) || 0
 
-//         const presentAmount = round2(perDay * presentDay)
-//         const absentAmount = round2(perDay * absentDay)
+//         const presentAmount = perDay * presentDay
+//         const absentAmount = perDay * absentDay
 //         const totalSalaryDays = presentDay + approvlLvn
 //         const dutyHours = 8
-//         const totalMonthHours = round2(dutyHours * totalMonthDays)
-//         const prHours = totalMonthHours > 0 ? round2(empGross / totalMonthHours) : 0
-//         const lateHourAmount = round2(prHours * lateHours)
-//         const salaryExp = round2(presentAmount - lateHourAmount)
-//         const approvlLvn2 = round2(approvlLvn * perDay)
-//         const overTime = round2(prHours * overTimeHour)
-//         const holdSalary = round2(basicSalary * 0.025)
+//         const totalMonthHours = dutyHours * totalMonthDays
+//         const prHours = totalMonthHours > 0 ? empGross / totalMonthHours : 0
+//         const lateHourAmount = prHours * lateHours
+//         const salaryExp = presentAmount - lateHourAmount
+//         const approvlLvn2 = approvlLvn * perDay
+//         const overTime = prHours * overTimeHour
+//         // ✅ Hold Salary calculated from GROSS (not basic)
+//         const holdSalary = empGross * 0.025
 //         const deductHealthInsurance = 0
-//         const totalSalary = round2(salaryExp + approvlLvn2 + overTime - holdSalary - deductHealthInsurance)
+//         const totalSalary = salaryExp + approvlLvn2 + overTime - holdSalary - deductHealthInsurance
 
 //         const isPublished = publishedSet.has(sheet.user_id)
 
@@ -282,13 +294,18 @@
 //       const updated = [...prev]
 //       const row = { ...updated[index], [field]: value }
 
-//       row.total_salary = round2(
+//       // ✅ If late_hours is being updated, round it off
+//       if (field === 'late_hours') {
+//         row.late_hours = roundLateHours(value)
+//         row.late_hour_amount = row.pr_hours * row.late_hours
+//         row.salary_exp = row.present_amount - row.late_hour_amount
+//       }
+
+//       row.total_salary =
 //         row.salary_exp + row.approvl_lvn_2 + row.over_time -
 //         row.hold_salary - row.deduct_health_insurance
-//       )
-//       row.net_salary_payable = round2(
+//       row.net_salary_payable =
 //         row.total_salary - row.loan - row.adv_salary - row.income_tax
-//       )
 
 //       updated[index] = row
 //       return updated
@@ -302,33 +319,33 @@
 //     designation: row.designation,
 //     cnic: row.cnic,
 //     total_increase: 0,
-//     gross: row.gross,
-//     total_gross_after_increa: row.gross,
-//     basic_salary: row.basic_salary,
-//     per_month_salary: row.per_month_salary,
-//     per_day: row.per_day,
+//     gross: round2(row.gross),
+//     total_gross_after_increa: round2(row.gross),
+//     basic_salary: round2(row.basic_salary),
+//     per_month_salary: round2(row.per_month_salary),
+//     per_day: round2(row.per_day),
 //     present_day: row.present_day,
-//     present_amount: row.present_amount,
+//     present_amount: round2(row.present_amount),
 //     absent_day: row.absent_day,
-//     absent_amount: row.absent_amount,
+//     absent_amount: round2(row.absent_amount),
 //     approvl_lvn: row.approvl_lvn,
 //     total_salary_days: row.total_salary_days,
 //     duty_hours: row.duty_hours,
-//     pr_hours: row.pr_hours,
-//     total_month_hours: row.total_month_hours,
+//     pr_hours: round2(row.pr_hours),
+//     total_month_hours: round2(row.total_month_hours),
 //     late_hours: row.late_hours,
-//     late_hour_amount: row.late_hour_amount,
-//     salary_exp: row.salary_exp,
-//     approvl_lvn_2: row.approvl_lvn_2,
+//     late_hour_amount: round2(row.late_hour_amount),
+//     salary_exp: round2(row.salary_exp),
+//     approvl_lvn_2: round2(row.approvl_lvn_2),
 //     over_time_hour: row.over_time_hour,
-//     over_time: row.over_time,
-//     hold_salary: row.hold_salary,
-//     deduct_health_insurance: row.deduct_health_insurance,
-//     total_salary: row.total_salary,
-//     loan: row.loan,
-//     adv_salary: row.adv_salary,
-//     income_tax: row.income_tax,
-//     net_salary_payable: row.net_salary_payable,
+//     over_time: round2(row.over_time),
+//     hold_salary: round2(row.hold_salary),
+//     deduct_health_insurance: round2(row.deduct_health_insurance),
+//     total_salary: round2(row.total_salary),
+//     loan: round2(row.loan),
+//     adv_salary: round2(row.adv_salary),
+//     income_tax: round2(row.income_tax),
+//     net_salary_payable: round2(row.net_salary_payable),
 //     month_year: monthYear,
 //     updated_at: new Date().toISOString()
 //   })
@@ -511,12 +528,14 @@
 
 //   // ============ PRINT (SINGLE SLIP - NO DUPLICATE) ============
 //   const handlePrint = (row: BulkPayrollRow) => {
-//     const totalDeductions =
+//     const totalDeductions = round2(
 //       row.hold_salary + row.deduct_health_insurance +
 //       row.loan + row.adv_salary + row.income_tax
+//     )
 
-//     const fmtPlain = (n: number) => `${round2(n ?? 0)}`
-//     const fmtDeduct = (n: number) => `(${Math.abs(round2(n ?? 0))})`
+//     // ✅ Format with 2 decimal places (keeps original decimals)
+//     const fmtPlain = (n: number) => round2(n ?? 0).toFixed(2)
+//     const fmtDeduct = (n: number) => `(${Math.abs(round2(n ?? 0)).toFixed(2)})`
 
 //     let monthYearLabel = '-'
 //     if (row.from_date) {
@@ -614,7 +633,7 @@
 //         <tbody>
 //           <tr class="netpay-row">
 //             <td style="width:70%">NET SALARY PAYABLE</td>
-//             <td class="right" style="width:30%">${fmtDeduct(row.net_salary_payable)}</td>
+//             <td class="right" style="width:30%">${fmtPlain(row.net_salary_payable)}</td>
 //           </tr>
 //         </tbody>
 //       </table>
@@ -634,7 +653,7 @@
 //   // =====================================================
 //   const publishedCount = rows.filter(r => r.published).length
 //   const unpublishedCount = rows.length - publishedCount
-//   const totalNetPayable = rows.reduce((sum, r) => sum + r.net_salary_payable, 0)
+//   const totalNetPayable = round2(rows.reduce((sum, r) => sum + r.net_salary_payable, 0))
 
 //   if (loading && rows.length === 0) {
 //     return (
@@ -796,7 +815,7 @@
 //                 <div className="bg-white shadow-sm p-4">
 //                   <div className={`text-sm text-gray-500 tracking-wide`}>Total Net Payable</div>
 //                   <div className={`text-xl font-bold text-blue-700 tracking-wider`}>
-//                     Rs. {totalNetPayable.toLocaleString('en-PK')}
+//                     Rs. {totalNetPayable.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 //                   </div>
 //                 </div>
 //               </div>
@@ -900,6 +919,7 @@
 //                           <td className="px-2 py-2 whitespace-nowrap">
 //                             <input
 //                               type="number"
+//                               step="0.01"
 //                               value={row.deduct_health_insurance}
 //                               onChange={(e) => updateRow(idx, 'deduct_health_insurance', parseFloat(e.target.value) || 0)}
 //                               disabled={row.published}
@@ -910,6 +930,7 @@
 //                           <td className="px-2 py-2 whitespace-nowrap">
 //                             <input
 //                               type="number"
+//                               step="0.01"
 //                               value={row.loan}
 //                               onChange={(e) => updateRow(idx, 'loan', parseFloat(e.target.value) || 0)}
 //                               disabled={row.published}
@@ -920,6 +941,7 @@
 //                           <td className="px-2 py-2 whitespace-nowrap">
 //                             <input
 //                               type="number"
+//                               step="0.01"
 //                               value={row.adv_salary}
 //                               onChange={(e) => updateRow(idx, 'adv_salary', parseFloat(e.target.value) || 0)}
 //                               disabled={row.published}
@@ -930,6 +952,7 @@
 //                           <td className="px-2 py-2 whitespace-nowrap">
 //                             <input
 //                               type="number"
+//                               step="0.01"
 //                               value={row.income_tax}
 //                               onChange={(e) => updateRow(idx, 'income_tax', parseFloat(e.target.value) || 0)}
 //                               disabled={row.published}
@@ -1007,7 +1030,7 @@
 //                     )}
 //                   </div>
 //                   <div className={`text-sm font-bold text-blue-700 tracking-wide`}>
-//                     Total Net Payable: Rs. {totalNetPayable.toLocaleString('en-PK')}
+//                     Total Net Payable: Rs. {totalNetPayable.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 //                   </div>
 //                 </div>
 //               </div>
@@ -1029,6 +1052,7 @@
 // }
 
 
+
 // app/hr/payroll/page.tsx
 'use client'
 
@@ -1039,7 +1063,7 @@ import NavbarDropdown from '@/components/navbar'
 import { createClient } from '@supabase/supabase-js'
 import {
   Loader, Printer, Download, AlertCircle, CheckCircle2, Upload,
-  UploadCloud, Database, Trash2
+  UploadCloud, Database, Trash2, Check
 } from 'lucide-react'
 import { Roboto } from 'next/font/google'
 
@@ -1097,13 +1121,38 @@ interface BulkPayrollRow {
   publishing?: boolean
   published?: boolean
   deleting?: boolean
+  // ✅ Loan tracking
+  loan_id?: number
+  loan_installment_for_month?: number
+  loan_month_index?: number
+  loan_month_label?: string
+  loan_total?: number
+  loan_recovered_before?: number
+  loan_remaining_before?: number
+  loan_applied?: boolean   // ✅ tick mark state
+}
+
+interface LoanRow {
+  id: number
+  user_id: string
+  total_loan: number
+  amount_recovered: number
+  amount_remaining: number
+  monthly_installment: number
+  time_period: Array<{ installment: string; month: string; amount: number }> | null
 }
 
 // =====================================================
 // Helpers
 // =====================================================
-const round2 = (n: number) => (!Number.isFinite(n) ? 0 : Math.round(n))
-const fmt = (n: number) => round2(n ?? 0).toString()
+const round2 = (n: number) => {
+  if (!Number.isFinite(n)) return 0
+  return Math.round((n + Number.EPSILON) * 100) / 100
+}
+
+const fmt = (n: number) => round2(n ?? 0).toFixed(2)
+
+const roundLateHours = (n: number) => (!Number.isFinite(n) ? 0 : Math.floor(n))
 
 const calcDaysBetween = (fromDate: string, toDate: string): number => {
   if (!fromDate || !toDate) return 0
@@ -1218,6 +1267,16 @@ export default function PayrollPage() {
 
       const empMap = new Map((empData || []).map(e => [e.employee_id, e]))
 
+      // ✅ Load loans
+      const { data: loanData } = await supabase
+        .from('employee_loans')
+        .select('id, user_id, total_loan, amount_recovered, amount_remaining, monthly_installment, time_period')
+        .in('user_id', userIds)
+
+      const loanMap = new Map<string, LoanRow>(
+        (loanData || []).map(l => [l.user_id, l as LoanRow])
+      )
+
       const monthYear = monthKey + '-01'
       const { data: existingPayrolls } = await supabase
         .from('payroll')
@@ -1230,31 +1289,62 @@ export default function PayrollPage() {
         const emp = empMap.get(sheet.user_id)
         const empGross = Number(emp?.gross_salary) || 0
         const empBasic = Number(emp?.basic_salary) || 0
-        const basicSalary = empBasic > 0 ? empBasic : round2(empGross / 2)
+        const basicSalary = empBasic > 0 ? empBasic : empGross / 2
 
         const totalMonthDays = Number(sheet.total_month_days) || calcDaysBetween(fromDate, toDate)
-        const perMonthSalary = round2(basicSalary / totalMonthDays)
-        const perDay = round2((basicSalary / totalMonthDays) * 2)
+        const perMonthSalary = totalMonthDays > 0 ? basicSalary / totalMonthDays : 0
+        const perDay = totalMonthDays > 0 ? (basicSalary / totalMonthDays) * 2 : 0
         const presentDay = Number(sheet.total_present) || 0
         const absentDay = Number(sheet.total_absent) || 0
         const approvlLvn = Number(sheet.approved_leaves) || 0
-        const lateHours = Number(sheet.late_hours) || 0
+        const lateHours = roundLateHours(Number(sheet.late_hours) || 0)
         const overTimeHour = Number(sheet.overtime_hours) || 0
 
-        const presentAmount = round2(perDay * presentDay)
-        const absentAmount = round2(perDay * absentDay)
+        const presentAmount = perDay * presentDay
+        const absentAmount = perDay * absentDay
         const totalSalaryDays = presentDay + approvlLvn
         const dutyHours = 8
-        const totalMonthHours = round2(dutyHours * totalMonthDays)
-        const prHours = totalMonthHours > 0 ? round2(empGross / totalMonthHours) : 0
-        const lateHourAmount = round2(prHours * lateHours)
-        const salaryExp = round2(presentAmount - lateHourAmount)
-        const approvlLvn2 = round2(approvlLvn * perDay)
-        const overTime = round2(prHours * overTimeHour)
-        // ✅ Hold Salary now calculated from GROSS (not basic)
-        const holdSalary = round2(empGross * 0.025)
+        const totalMonthHours = dutyHours * totalMonthDays
+        const prHours = totalMonthHours > 0 ? empGross / totalMonthHours : 0
+        const lateHourAmount = prHours * lateHours
+        const salaryExp = presentAmount - lateHourAmount
+        const approvlLvn2 = approvlLvn * perDay
+        const overTime = prHours * overTimeHour
+        const holdSalary = empGross * 0.025
         const deductHealthInsurance = 0
-        const totalSalary = round2(salaryExp + approvlLvn2 + overTime - holdSalary - deductHealthInsurance)
+
+        // ✅ Loan lookup
+        const loan = loanMap.get(sheet.user_id)
+        let loanAmount = 0
+        let loanId: number | undefined
+        let loanInstallmentForMonth = 0
+        let loanMonthIndex = 0
+        let loanMonthLabel = ''
+        let loanTotal = 0
+        let loanRecoveredBefore = 0
+        let loanRemainingBefore = 0
+
+        if (loan && Array.isArray(loan.time_period)) {
+          const period = loan.time_period
+          const idx = period.findIndex(p => p.month === monthKey)
+          if (idx !== -1) {
+            const entry = period[idx]
+            const amt = Number(entry.amount) || 0
+            if (Number(loan.amount_remaining) > 0 && amt > 0) {
+              loanAmount = amt
+              loanId = loan.id
+              loanInstallmentForMonth = amt
+              loanMonthIndex = idx + 1
+              loanMonthLabel = entry.installment || ''
+              loanTotal = Number(loan.total_loan) || 0
+              loanRecoveredBefore = Number(loan.amount_recovered) || 0
+              loanRemainingBefore = Number(loan.amount_remaining) || 0
+            }
+          }
+        }
+
+        const totalSalary = salaryExp + approvlLvn2 + overTime - holdSalary - deductHealthInsurance
+        const netSalaryPayable = totalSalary - loanAmount
 
         const isPublished = publishedSet.has(sheet.user_id)
 
@@ -1288,19 +1378,28 @@ export default function PayrollPage() {
           hold_salary: holdSalary,
           deduct_health_insurance: deductHealthInsurance,
           total_salary: totalSalary,
-          loan: 0,
+          loan: loanAmount,
           adv_salary: 0,
           income_tax: 0,
-          net_salary_payable: totalSalary,
+          net_salary_payable: netSalaryPayable,
           from_date: fromDate,
           to_date: toDate,
           publishing: false,
-          published: isPublished
+          published: isPublished,
+          loan_id: loanId,
+          loan_installment_for_month: loanInstallmentForMonth,
+          loan_month_index: loanMonthIndex,
+          loan_month_label: loanMonthLabel,
+          loan_total: loanTotal,
+          loan_recovered_before: loanRecoveredBefore,
+          loan_remaining_before: loanRemainingBefore,
+          loan_applied: loanAmount > 0   // ✅ default ticked if loan exists
         }
       })
 
       setRows(newRows)
-      setMessage(`✅ Imported ${newRows.length} employees for ${monthKey}`)
+      const withLoans = newRows.filter(r => r.loan > 0).length
+      setMessage(`✅ Imported ${newRows.length} employees for ${monthKey}${withLoans > 0 ? ` • ${withLoans} with loan installments` : ''}`)
     } catch (err: any) {
       setMessage(`❌ ${err.message || 'Import failed'}`)
     } finally {
@@ -1314,56 +1413,97 @@ export default function PayrollPage() {
       const updated = [...prev]
       const row = { ...updated[index], [field]: value }
 
-      row.total_salary = round2(
+      if (field === 'late_hours') {
+        row.late_hours = roundLateHours(value)
+        row.late_hour_amount = row.pr_hours * row.late_hours
+        row.salary_exp = row.present_amount - row.late_hour_amount
+      }
+
+      row.total_salary =
         row.salary_exp + row.approvl_lvn_2 + row.over_time -
         row.hold_salary - row.deduct_health_insurance
-      )
-      row.net_salary_payable = round2(
+      row.net_salary_payable =
         row.total_salary - row.loan - row.adv_salary - row.income_tax
-      )
 
       updated[index] = row
       return updated
     })
   }
 
-  // ============ BUILD PAYLOAD ============
+  // ✅ Toggle loan applied for a specific row
+  const toggleLoanApplied = (index: number) => {
+    setRows(prev => {
+      const updated = [...prev]
+      const row = { ...updated[index] }
+      const newApplied = !row.loan_applied
+      row.loan_applied = newApplied
+      const effectiveLoan = newApplied ? (row.loan_installment_for_month || 0) : 0
+      row.loan = effectiveLoan
+      row.net_salary_payable =
+        row.total_salary - row.loan - row.adv_salary - row.income_tax
+      updated[index] = row
+      return updated
+    })
+  }
+
+  // ============ BUILD PAYROLL PAYLOAD ============
   const buildPayload = (row: BulkPayrollRow, monthYear: string) => ({
     employee_id: row.employee_id,
     name: row.name,
     designation: row.designation,
     cnic: row.cnic,
     total_increase: 0,
-    gross: row.gross,
-    total_gross_after_increa: row.gross,
-    basic_salary: row.basic_salary,
-    per_month_salary: row.per_month_salary,
-    per_day: row.per_day,
+    gross: round2(row.gross),
+    total_gross_after_increa: round2(row.gross),
+    basic_salary: round2(row.basic_salary),
+    per_month_salary: round2(row.per_month_salary),
+    per_day: round2(row.per_day),
     present_day: row.present_day,
-    present_amount: row.present_amount,
+    present_amount: round2(row.present_amount),
     absent_day: row.absent_day,
-    absent_amount: row.absent_amount,
+    absent_amount: round2(row.absent_amount),
     approvl_lvn: row.approvl_lvn,
     total_salary_days: row.total_salary_days,
     duty_hours: row.duty_hours,
-    pr_hours: row.pr_hours,
-    total_month_hours: row.total_month_hours,
+    pr_hours: round2(row.pr_hours),
+    total_month_hours: round2(row.total_month_hours),
     late_hours: row.late_hours,
-    late_hour_amount: row.late_hour_amount,
-    salary_exp: row.salary_exp,
-    approvl_lvn_2: row.approvl_lvn_2,
+    late_hour_amount: round2(row.late_hour_amount),
+    salary_exp: round2(row.salary_exp),
+    approvl_lvn_2: round2(row.approvl_lvn_2),
     over_time_hour: row.over_time_hour,
-    over_time: row.over_time,
-    hold_salary: row.hold_salary,
-    deduct_health_insurance: row.deduct_health_insurance,
-    total_salary: row.total_salary,
-    loan: row.loan,
-    adv_salary: row.adv_salary,
-    income_tax: row.income_tax,
-    net_salary_payable: row.net_salary_payable,
+    over_time: round2(row.over_time),
+    hold_salary: round2(row.hold_salary),
+    deduct_health_insurance: round2(row.deduct_health_insurance),
+    total_salary: round2(row.total_salary),
+    loan: round2(row.loan),
+    adv_salary: round2(row.adv_salary),
+    income_tax: round2(row.income_tax),
+    net_salary_payable: round2(row.net_salary_payable),
     month_year: monthYear,
     updated_at: new Date().toISOString()
   })
+
+  // ============ UPDATE LOAN AFTER PUBLISH ============
+  const applyLoanRecovery = async (row: BulkPayrollRow): Promise<void> => {
+    if (!row.loan_id || !row.loan || row.loan <= 0) return
+
+    const recoveredNow = round2((row.loan_recovered_before || 0) + row.loan)
+    const remainingNow = round2(Math.max(0, (row.loan_remaining_before || 0) - row.loan))
+
+    const { error } = await supabase
+      .from('employee_loans')
+      .update({
+        amount_recovered: recoveredNow,
+        amount_remaining: remainingNow
+      })
+      .eq('id', row.loan_id)
+
+    if (error) throw new Error(`Loan update failed: ${error.message}`)
+
+    row.loan_recovered_before = recoveredNow
+    row.loan_remaining_before = remainingNow
+  }
 
   // ============ PUBLISH SINGLE ============
   const handlePublish = async (index: number) => {
@@ -1395,14 +1535,22 @@ export default function PayrollPage() {
         if (error) throw error
       }
 
+      await applyLoanRecovery(row)
+
       setRows(prev => {
         const updated = [...prev]
-        updated[index] = { ...updated[index], publishing: false, published: true }
+        updated[index] = {
+          ...updated[index],
+          publishing: false,
+          published: true,
+          loan_recovered_before: row.loan_recovered_before,
+          loan_remaining_before: row.loan_remaining_before
+        }
         return updated
       })
 
-      setMessage(`✅ ${row.name} payroll published successfully!`)
-      setTimeout(() => setMessage(null), 3000)
+      setMessage(`✅ ${row.name} payroll published successfully!${row.loan > 0 ? ` • Loan Rs. ${fmt(row.loan)} recovered` : ''}`)
+      setTimeout(() => setMessage(null), 3500)
     } catch (err: any) {
       setRows(prev => {
         const updated = [...prev]
@@ -1440,17 +1588,32 @@ export default function PayrollPage() {
 
       if (error) throw error
 
+      if (row.loan_id && row.loan && row.loan > 0) {
+        const recoveredBack = round2(Math.max(0, (row.loan_recovered_before || 0) - row.loan))
+        const remainingBack = round2((row.loan_remaining_before || 0) + row.loan)
+
+        await supabase
+          .from('employee_loans')
+          .update({
+            amount_recovered: recoveredBack,
+            amount_remaining: remainingBack
+          })
+          .eq('id', row.loan_id)
+
+        row.loan_recovered_before = recoveredBack
+        row.loan_remaining_before = remainingBack
+      }
+
       setRows(prev => {
         const updated = [...prev]
         updated[index] = {
           ...updated[index],
           deleting: false,
           published: false,
-          loan: 0,
           adv_salary: 0,
           income_tax: 0,
           deduct_health_insurance: 0,
-          net_salary_payable: updated[index].total_salary
+          net_salary_payable: updated[index].total_salary - updated[index].loan
         }
         return updated
       })
@@ -1496,6 +1659,7 @@ export default function PayrollPage() {
 
       let successCount = 0
       let failCount = 0
+      let loansUpdated = 0
       const successIds: string[] = []
 
       for (const { row } of unpublishedRows) {
@@ -1510,6 +1674,12 @@ export default function PayrollPage() {
             const { error } = await supabase.from('payroll').insert(payload)
             if (error) throw error
           }
+
+          if (row.loan_id && row.loan > 0) {
+            await applyLoanRecovery(row)
+            loansUpdated++
+          }
+
           successCount++
           successIds.push(row.employee_id)
         } catch (err) {
@@ -1527,7 +1697,7 @@ export default function PayrollPage() {
       }))
 
       if (failCount === 0) {
-        setMessage(`✅ Published ${successCount} payrolls successfully!`)
+        setMessage(`✅ Published ${successCount} payrolls successfully!${loansUpdated > 0 ? ` • ${loansUpdated} loans updated` : ''}`)
       } else {
         setMessage(`⚠️ Published: ${successCount}, Failed: ${failCount}`)
       }
@@ -1541,14 +1711,15 @@ export default function PayrollPage() {
     }
   }
 
-  // ============ PRINT (SINGLE SLIP - NO DUPLICATE) ============
+  // ============ PRINT ============
   const handlePrint = (row: BulkPayrollRow) => {
-    const totalDeductions =
+    const totalDeductions = round2(
       row.hold_salary + row.deduct_health_insurance +
       row.loan + row.adv_salary + row.income_tax
+    )
 
-    const fmtPlain = (n: number) => `${round2(n ?? 0)}`
-    const fmtDeduct = (n: number) => `(${Math.abs(round2(n ?? 0))})`
+    const fmtPlain = (n: number) => round2(n ?? 0).toFixed(2)
+    const fmtDeduct = (n: number) => `(${Math.abs(round2(n ?? 0)).toFixed(2)})`
 
     let monthYearLabel = '-'
     if (row.from_date) {
@@ -1562,6 +1733,10 @@ export default function PayrollPage() {
     const logoUrl = typeof window !== 'undefined'
       ? `${window.location.origin}/logo.png`
       : '/logo.png'
+
+    const loanLabel = row.loan_month_label
+      ? `Loan (${row.loan_month_label} Installment)`
+      : 'Loan'
 
     const html = `<!DOCTYPE html><html><head><title>Pay Slip - ${row.name}</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
@@ -1633,10 +1808,10 @@ export default function PayrollPage() {
           </tr>
         </thead>
         <tbody>
-          <tr><td class="label">Hold Salary (2.5% of Gross)</td><td class="right">${fmtDeduct(row.hold_salary)}</td></tr>
+          <tr><td class="label">Hold Salary (2.5%)</td><td class="right">${fmtDeduct(row.hold_salary)}</td></tr>
           <tr><td class="label">Health Insurance Policy</td><td class="right">${fmtDeduct(row.deduct_health_insurance)}</td></tr>
           <tr><td class="label">Advance Deduction</td><td class="right">${fmtDeduct(row.adv_salary)}</td></tr>
-          <tr><td class="label">Loan</td><td class="right">${fmtDeduct(row.loan)}</td></tr>
+          <tr><td class="label">${loanLabel}</td><td class="right">${fmtDeduct(row.loan)}</td></tr>
           <tr><td class="label">Income Tax</td><td class="right">${fmtDeduct(row.income_tax)}</td></tr>
           <tr class="total-row"><td>Total Deductions</td><td class="right">${fmtDeduct(totalDeductions)}</td></tr>
         </tbody>
@@ -1646,7 +1821,7 @@ export default function PayrollPage() {
         <tbody>
           <tr class="netpay-row">
             <td style="width:70%">NET SALARY PAYABLE</td>
-            <td class="right" style="width:30%">${fmtDeduct(row.net_salary_payable)}</td>
+            <td class="right" style="width:30%">${fmtPlain(row.net_salary_payable)}</td>
           </tr>
         </tbody>
       </table>
@@ -1666,7 +1841,8 @@ export default function PayrollPage() {
   // =====================================================
   const publishedCount = rows.filter(r => r.published).length
   const unpublishedCount = rows.length - publishedCount
-  const totalNetPayable = rows.reduce((sum, r) => sum + r.net_salary_payable, 0)
+  const totalNetPayable = round2(rows.reduce((sum, r) => sum + r.net_salary_payable, 0))
+  const totalLoanDeducted = round2(rows.reduce((sum, r) => sum + r.loan, 0))
 
   if (loading && rows.length === 0) {
     return (
@@ -1812,7 +1988,7 @@ export default function PayrollPage() {
 
             {/* ============= STATS ============= */}
             {rows.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                 <div className="bg-white shadow-sm p-4">
                   <div className={`text-sm text-gray-500 tracking-wide`}>Total Records</div>
                   <div className={`text-2xl font-bold text-[#0071BD] tracking-wider`}>{rows.length}</div>
@@ -1826,9 +2002,15 @@ export default function PayrollPage() {
                   <div className={`text-2xl font-bold text-yellow-600 tracking-wider`}>{unpublishedCount}</div>
                 </div>
                 <div className="bg-white shadow-sm p-4">
+                  <div className={`text-sm text-gray-500 tracking-wide`}>Total Loan Deducted</div>
+                  <div className={`text-xl font-bold text-purple-700 tracking-wider`}>
+                    Rs. {totalLoanDeducted.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="bg-white shadow-sm p-4">
                   <div className={`text-sm text-gray-500 tracking-wide`}>Total Net Payable</div>
                   <div className={`text-xl font-bold text-blue-700 tracking-wider`}>
-                    Rs. {totalNetPayable.toLocaleString('en-PK')}
+                    Rs. {totalNetPayable.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
               </div>
@@ -1843,7 +2025,7 @@ export default function PayrollPage() {
                     Select Month + Year and click <span className="text-green-600 font-bold">Import</span> to load payroll data
                   </p>
                   <p className={`text-xs text-gray-400 tracking-wide mt-2`}>
-                    All attendance_sheet records will load with full payroll calculations
+                    Loan installments will auto-fill from employee_loans table
                   </p>
                 </div>
               )
@@ -1876,7 +2058,7 @@ export default function PayrollPage() {
                         <th className={`px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap`}>Salary Exp</th>
                         <th className={`px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap`}>Hold</th>
                         <th className={`px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap`}>Health Ins</th>
-                        <th className={`px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap`}>Loan</th>
+                        <th className={`px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase pr-9 tracking-wider whitespace-nowrap`}>Loan</th>
                         <th className={`px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap`}>Adv Sal</th>
                         <th className={`px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap`}>Inc Tax</th>
                         <th className={`px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap`}>Total Salary</th>
@@ -1932,6 +2114,7 @@ export default function PayrollPage() {
                           <td className="px-2 py-2 whitespace-nowrap">
                             <input
                               type="number"
+                              step="0.01"
                               value={row.deduct_health_insurance}
                               onChange={(e) => updateRow(idx, 'deduct_health_insurance', parseFloat(e.target.value) || 0)}
                               disabled={row.published}
@@ -1939,19 +2122,43 @@ export default function PayrollPage() {
                             />
                           </td>
 
+                          {/* ✅ LOAN CELL: plain text + tick mark */}
                           <td className="px-2 py-2 whitespace-nowrap">
-                            <input
-                              type="number"
-                              value={row.loan}
-                              onChange={(e) => updateRow(idx, 'loan', parseFloat(e.target.value) || 0)}
-                              disabled={row.published}
-                              className="w-20 px-2 py-1 text-sm text-right border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none text-black bg-yellow-50 rounded disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            />
+                            <div className="flex flex-col items-center gap-0.5">
+                              {row.loan_installment_for_month && row.loan_installment_for_month > 0 ? (
+                                <span className="text-[10px] font-medium text-purple-600 tracking-wide leading-none">
+                                  {row.loan_month_label} inst.
+                                </span>
+                              ) : (
+                                <span className="text-[10px] leading-none opacity-0">—</span>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <span className={`text-sm text-right tabular-nums ${row.loan_applied && row.loan > 0 ? 'text-purple-700 font-semibold' : 'text-gray-400'}`}>
+                                  {fmt(row.loan)}
+                                </span>
+                                {row.loan_installment_for_month && row.loan_installment_for_month > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleLoanApplied(idx)}
+                                    disabled={row.published}
+                                    title={row.loan_applied ? 'Loan applied — click to skip' : 'Loan skipped — click to apply'}
+                                    className={`flex items-center justify-center w-5 h-5 rounded border transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                                      row.loan_applied
+                                        ? 'bg-purple-600 border-purple-600 text-white hover:bg-purple-700'
+                                        : 'bg-white border-gray-300 text-gray-300 hover:border-purple-400 hover:text-purple-400'
+                                    }`}
+                                  >
+                                    <Check className="w-3 h-3" strokeWidth={3} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           </td>
 
                           <td className="px-2 py-2 whitespace-nowrap">
                             <input
                               type="number"
+                              step="0.01"
                               value={row.adv_salary}
                               onChange={(e) => updateRow(idx, 'adv_salary', parseFloat(e.target.value) || 0)}
                               disabled={row.published}
@@ -1962,6 +2169,7 @@ export default function PayrollPage() {
                           <td className="px-2 py-2 whitespace-nowrap">
                             <input
                               type="number"
+                              step="0.01"
                               value={row.income_tax}
                               onChange={(e) => updateRow(idx, 'income_tax', parseFloat(e.target.value) || 0)}
                               disabled={row.published}
@@ -2039,7 +2247,7 @@ export default function PayrollPage() {
                     )}
                   </div>
                   <div className={`text-sm font-bold text-blue-700 tracking-wide`}>
-                    Total Net Payable: Rs. {totalNetPayable.toLocaleString('en-PK')}
+                    Total Net Payable: Rs. {totalNetPayable.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
               </div>
@@ -2059,5 +2267,3 @@ function XIcon() {
     </svg>
   )
 }
-
-
