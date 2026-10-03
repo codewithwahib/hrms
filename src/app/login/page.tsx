@@ -639,7 +639,7 @@ export default function HRLoginPage() {
                 Forgot your password?
               </h2>
               <p className={`text-sm text-gray-500 mt-2 tracking-wide ${roboto.className}`}>
-                Enter your username and we'll send a reset request to the HR admin.
+                Enter your username and we&apos;ll send a reset request to the HR admin.
               </p>
             </div>
 

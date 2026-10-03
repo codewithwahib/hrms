@@ -1050,7 +1050,7 @@ export default function EmployeeLoginPage() {
                 Forgot your password?
               </h2>
               <p className="text-sm text-gray-500 mt-2 tracking-wide">
-                Enter your registered email address and we'll send you a password reset link.
+                Enter your registered email address and we&apos;ll send you a password reset link.
               </p>
             </div>
 
