@@ -1,33 +1,34 @@
-// src/app/hr/add-attenadance/page.tsx
+// src/app/admin/attendance/add/page.tsx
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import NavbarDropdown from '@/components/navbar'
 import Footer from '@/components/footer'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import { useRouter } from 'next/navigation'
+import { createClient } from '@supabase/supabase-js'
+import { Roboto } from 'next/font/google'
 import {
+  Loader,
+  AlertCircle,
+  CheckCircle,
   User,
-  Search,
-  Building,
-  Globe,
+  Calendar,
   Clock,
+  MapPin,
+  ChevronDown,
   LogIn,
   LogOut,
-  Calendar,
-  Check,
-  X,
-  AlertCircle,
+  Plus,
+  Hash,
+  Building,
+  Briefcase,
+  PlusCircle,
+  Lock,
   RefreshCw,
-  Users,
-  ChevronDown,
-  History,
-  Timer,
-  BadgeCheck,
-  Save,
+  Mail,
+  ShieldCheck,
+  CalendarDays,
 } from 'lucide-react'
-
-import { Roboto } from 'next/font/google'
 
 const roboto = Roboto({
   weight: ['100', '300', '400', '500', '700', '900'],
@@ -36,113 +37,188 @@ const roboto = Roboto({
   display: 'swap',
 })
 
-// =====================================================
-// Types
-// =====================================================
+// ============================================================
+// SUPABASE CLIENT
+// ============================================================
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// ============================================================
+// BRANCH OPTIONS
+// ============================================================
+
+const BRANCH_OPTIONS = [
+  { value: 'K', label: 'Korangi', device: 'K-01', branch: 'K' },
+  { value: 'PQ', label: 'Port Qasim', device: 'PQ-01', branch: 'PQ' },
+] as const
+
+type BranchValue = (typeof BRANCH_OPTIONS)[number]['value']
+
+// ============================================================
+// INTERFACES
+// ============================================================
+
 interface Employee {
-  id: string
-  employeeId: string
-  fullName: string
+  employee_id: string
+  full_name: string
   department: string | null
   position: string | null
-  source: 'K' | 'PQ'
-  shift: string | null
-  shiftTiming: string | null
-  branch: string
+  source: string | null
 }
 
-interface AttendanceRecord {
+interface AttendanceLog {
   id: number
   user_id: string
   employee_name: string | null
   timestamp: string
-  punch_type: 'CHECK_IN' | 'CHECK_OUT'
+  punch_type: 'CHECK_IN' | 'CHECK_OUT' | null
   device_id: string | null
   branch_code: string | null
+  raw_log_key: string
   created_at: string
+  source?: 'K' | 'PQ'
 }
 
-interface ManualPunchForm {
-  employeeId: string
-  employeeName: string
-  branch: 'K' | 'PQ' | ''
-  punchType: 'CHECK_IN' | 'CHECK_OUT' | ''
-  punchDate: string
-  punchTime: string
-  deviceId: string
+// ============================================================
+// HELPERS
+// ============================================================
+
+const toLocalDateStr = (isoTimestamp: string): string => {
+  if (!isoTimestamp) return ''
+  try {
+    const d = new Date(isoTimestamp)
+    if (isNaN(d.getTime())) return ''
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  } catch {
+    return ''
+  }
 }
 
-// =====================================================
-// Main Component
-// =====================================================
+const formatTimeForInput = (isoTimestamp: string): string => {
+  if (!isoTimestamp) return ''
+  try {
+    const d = new Date(isoTimestamp)
+    if (isNaN(d.getTime())) return ''
+    const h = String(d.getHours()).padStart(2, '0')
+    const m = String(d.getMinutes()).padStart(2, '0')
+    return `${h}:${m}`
+  } catch {
+    return ''
+  }
+}
+
+// ✅ NEW: Get day name from YYYY-MM-DD string
+const getDayNameFromDate = (dateStr: string): string => {
+  if (!dateStr) return ''
+  try {
+    // Use local time-safe parsing (YYYY-MM-DD → local date)
+    const [y, m, d] = dateStr.split('-').map(Number)
+    if (!y || !m || !d) return ''
+    const date = new Date(y, m - 1, d)
+    if (isNaN(date.getTime())) return ''
+    return date.toLocaleDateString('en-US', { weekday: 'long' })
+  } catch {
+    return ''
+  }
+}
+
+// ============================================================
+// PAGE
+// ============================================================
+
 export default function AddAttendancePage() {
   const router = useRouter()
 
-  // State
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([])
-  const [loadingEmployees, setLoadingEmployees] = useState(true)
-  const [employeeError, setEmployeeError] = useState('')
-
-  const [searchQuery, setSearchQuery] = useState('')
-  const [branchFilter, setBranchFilter] = useState<'ALL' | 'K' | 'PQ'>('ALL')
-  const [departmentFilter, setDepartmentFilter] = useState('ALL')
-
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true)
 
-  // Punch Form
-  const [punchForm, setPunchForm] = useState<ManualPunchForm>({
-    employeeId: '',
-    employeeName: '',
-    branch: '',
-    punchType: '',
-    punchDate: new Date().toISOString().split('T')[0],
-    punchTime: new Date().toTimeString().slice(0, 5),
-    deviceId: 'MANUAL_ENTRY',
-  })
+  const [selectedDate, setSelectedDate] = useState('')
 
-  const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState('')
+  const [checkInTime, setCheckInTime] = useState('')
+  const [checkOutTime, setCheckOutTime] = useState('')
+
+  const [existingLogsInfo, setExistingLogsInfo] = useState<{
+    hasCheckIn: boolean
+    hasCheckOut: boolean
+  }>({ hasCheckIn: false, hasCheckOut: false })
+
+  const [selectedBranch, setSelectedBranch] = useState<BranchValue>('K')
+
+  const [deviceId, setDeviceId] = useState('K-01')
+  const [branchCode, setBranchCode] = useState('K')
+
+  const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
-  // Recent attendance for selected employee
-  const [recentAttendance, setRecentAttendance] = useState<AttendanceRecord[]>([])
-  const [loadingAttendance, setLoadingAttendance] = useState(false)
+  // ✅ OTP states
+  const [otpCode, setOtpCode] = useState('')
+  const [isSendingOtp, setIsSendingOtp] = useState(false)
+  const [otpSentTo, setOtpSentTo] = useState('')
+  const [otpCountdown, setOtpCountdown] = useState(0)
 
-  // =====================================================
-  // Fetch Employees
-  // =====================================================
+  // ============================================================
+  // ✅ DAY NAME (auto-calculated from selectedDate)
+  // ============================================================
+
+  const dayName = useMemo(
+    () => getDayNameFromDate(selectedDate),
+    [selectedDate]
+  )
+
+  // ============================================================
+  // SET DEFAULT DATE
+  // ============================================================
+
+  useEffect(() => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+
+    setSelectedDate(`${year}-${month}-${day}`)
+  }, [])
+
+  // ============================================================
+  // OTP COUNTDOWN TIMER
+  // ============================================================
+
+  useEffect(() => {
+    if (otpCountdown <= 0) return
+    const t = setTimeout(() => setOtpCountdown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [otpCountdown])
+
+  // ============================================================
+  // FETCH EMPLOYEES
+  // ============================================================
+
   const fetchEmployees = useCallback(async () => {
-    setLoadingEmployees(true)
-    setEmployeeError('')
     try {
-      const res = await fetch('/api/hr/employees?limit=1000', {
-        headers: { Accept: 'application/json' },
-      })
-      if (!res.ok) throw new Error('Failed to fetch employees')
+      setIsLoadingEmployees(true)
 
-      const data = await res.json()
-      const list: any[] = data.employees || data.data || data || []
+      const { data, error } = await supabase
+        .from('employees')
+        .select('employee_id, full_name, department, position, source')
+        .order('employee_id', { ascending: true })
 
-      const mapped: Employee[] = list.map((e: any) => ({
-        id: e.id?.toString() || e.employeeId || '',
-        employeeId: e.employeeId || e.employee_id || '',
-        fullName: e.fullName || e.full_name || e.name || '',
-        department: e.department || null,
-        position: e.position || e.designation || null,
-        source: (e.source || e.branch || 'K') as 'K' | 'PQ',
-        shift: e.shift || null,
-        shiftTiming: e.shiftTiming || e.shift_timing || null,
-        branch: (e.source || e.branch || 'K') === 'PQ' ? 'Port Qasim' : 'Korangi',
-      }))
+      if (error) throw new Error(error.message)
 
-      setEmployees(mapped)
-      setFilteredEmployees(mapped)
+      setEmployees(data || [])
     } catch (err) {
       console.error('Error fetching employees:', err)
-      setEmployeeError('Failed to load employees. Please try again.')
+      setError('Failed to load employees')
     } finally {
-      setLoadingEmployees(false)
+      setIsLoadingEmployees(false)
     }
   }, [])
 
@@ -150,690 +226,835 @@ export default function AddAttendancePage() {
     fetchEmployees()
   }, [fetchEmployees])
 
-  // =====================================================
-  // Filter Employees
-  // =====================================================
+  // ============================================================
+  // WHEN ID SELECTED — auto-fill + auto branch + reset OTP
+  // ============================================================
+
   useEffect(() => {
-    let result = [...employees]
-
-    if (branchFilter !== 'ALL') {
-      result = result.filter((e) => e.source === branchFilter)
+    if (!selectedEmployeeId) {
+      setSelectedEmployee(null)
+      setCheckInTime('')
+      setCheckOutTime('')
+      setExistingLogsInfo({ hasCheckIn: false, hasCheckOut: false })
+      setOtpCode('')
+      setOtpSentTo('')
+      setOtpCountdown(0)
+      return
     }
 
-    if (departmentFilter !== 'ALL') {
-      result = result.filter((e) => e.department === departmentFilter)
+    const emp = employees.find((e) => e.employee_id === selectedEmployeeId)
+    setSelectedEmployee(emp || null)
+
+    // Reset OTP on employee change
+    setOtpCode('')
+    setOtpSentTo('')
+    setOtpCountdown(0)
+
+    if (emp) {
+      const empBranch: BranchValue = emp.source === 'PQ' ? 'PQ' : 'K'
+      setSelectedBranch(empBranch)
+      setBranchCode(empBranch)
+      setDeviceId(empBranch === 'PQ' ? 'PQ-01' : 'K-01')
+    }
+  }, [selectedEmployeeId, employees])
+
+  // ============================================================
+  // HANDLE BRANCH CHANGE
+  // ============================================================
+
+  const handleBranchChange = useCallback((val: BranchValue) => {
+    setSelectedBranch(val)
+    const opt = BRANCH_OPTIONS.find((b) => b.value === val)
+    if (opt) {
+      setBranchCode(opt.branch)
+      setDeviceId(opt.device)
+    }
+  }, [])
+
+  // ============================================================
+  // FETCH EXISTING LOGS
+  // ============================================================
+
+  const fetchExistingLogs = useCallback(async () => {
+    if (!selectedEmployeeId || !selectedDate) {
+      setCheckInTime('')
+      setCheckOutTime('')
+      setExistingLogsInfo({ hasCheckIn: false, hasCheckOut: false })
+      return
     }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim()
-      result = result.filter(
-        (e) =>
-          e.fullName.toLowerCase().includes(q) ||
-          e.employeeId.toLowerCase().includes(q) ||
-          (e.department || '').toLowerCase().includes(q) ||
-          (e.position || '').toLowerCase().includes(q),
-      )
-    }
-
-    setFilteredEmployees(result)
-  }, [employees, searchQuery, branchFilter, departmentFilter])
-
-  // Get unique departments
-  const departments = Array.from(
-    new Set(employees.map((e) => e.department).filter(Boolean)),
-  ) as string[]
-
-  // =====================================================
-  // Select Employee -> auto-fill form
-  // =====================================================
-  const handleSelectEmployee = (emp: Employee) => {
-    setSelectedEmployee(emp)
-    setPunchForm({
-      employeeId: emp.employeeId,
-      employeeName: emp.fullName,
-      branch: emp.source, // ✅ Auto-select branch
-      punchType: '',
-      punchDate: new Date().toISOString().split('T')[0],
-      punchTime: new Date().toTimeString().slice(0, 5),
-      deviceId: 'MANUAL_ENTRY',
-    })
-    setSuccess('')
-    setError('')
-    fetchRecentAttendance(emp.employeeId)
-  }
-
-  // =====================================================
-  // Fetch recent attendance for an employee
-  // =====================================================
-  const fetchRecentAttendance = async (employeeId: string) => {
-    setLoadingAttendance(true)
     try {
-      const res = await fetch(
-        `/api/hr/attendance/employee/${encodeURIComponent(employeeId)}?limit=10`,
-        { headers: { Accept: 'application/json' } },
+      setIsLoadingLogs(true)
+
+      const [kLogs, pqLogs] = await Promise.all([
+        supabase
+          .from('attendance_logs')
+          .select('*')
+          .eq('user_id', selectedEmployeeId)
+          .order('timestamp', { ascending: true }),
+        supabase
+          .from('pq_attendance_logs')
+          .select('*')
+          .eq('user_id', selectedEmployeeId)
+          .order('timestamp', { ascending: true }),
+      ])
+
+      if (kLogs.error) console.warn('K logs error:', kLogs.error)
+      if (pqLogs.error) console.warn('PQ logs error:', pqLogs.error)
+
+      const allLogs: AttendanceLog[] = []
+
+      ;(kLogs.data || []).forEach((log: any) => {
+        allLogs.push({
+          id: Number(log.id),
+          user_id: String(log.user_id),
+          employee_name: String(log.employee_name ?? ''),
+          timestamp: log.timestamp,
+          punch_type:
+            log.punch_type === 'CHECK_OUT'
+              ? 'CHECK_OUT'
+              : log.punch_type === 'CHECK_IN'
+                ? 'CHECK_IN'
+                : null,
+          device_id: String(log.device_id ?? ''),
+          branch_code: String(log.branch_code ?? 'K'),
+          raw_log_key: String(log.raw_log_key ?? ''),
+          created_at: log.created_at,
+          source: 'K',
+        })
+      })
+
+      ;(pqLogs.data || []).forEach((log: any) => {
+        allLogs.push({
+          id: Number(log.id),
+          user_id: String(log.user_id),
+          employee_name: String(log.employee_name ?? ''),
+          timestamp: log.timestamp,
+          punch_type:
+            log.punch_type === 'CHECK_OUT'
+              ? 'CHECK_OUT'
+              : log.punch_type === 'CHECK_IN'
+                ? 'CHECK_IN'
+                : null,
+          device_id: String(log.device_id ?? ''),
+          branch_code: String(log.branch_code ?? 'PQ'),
+          raw_log_key: String(log.raw_log_key ?? ''),
+          created_at: log.created_at,
+          source: 'PQ',
+        })
+      })
+
+      const dayLogs = allLogs.filter(
+        (log) => toLocalDateStr(log.timestamp) === selectedDate
       )
-      if (!res.ok) {
-        setRecentAttendance([])
+
+      const sortedLogs = [...dayLogs].sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )
+
+      let checkInLog: AttendanceLog | null = null
+      let checkOutLog: AttendanceLog | null = null
+
+      if (sortedLogs.length === 1) {
+        const singleLog = sortedLogs[0]
+        const logHour = new Date(singleLog.timestamp).getHours()
+        if (logHour >= 18) {
+          checkOutLog = singleLog
+        } else {
+          checkInLog = singleLog
+        }
+      } else if (sortedLogs.length >= 2) {
+        checkInLog = sortedLogs[0]
+        const lastLog = sortedLogs[sortedLogs.length - 1]
+        const diffMs =
+          new Date(lastLog.timestamp).getTime() -
+          new Date(checkInLog.timestamp).getTime()
+        if (diffMs >= 3600000) {
+          checkOutLog = lastLog
+        }
+      }
+
+      const foundCheckIn = checkInLog
+        ? formatTimeForInput(checkInLog.timestamp)
+        : ''
+      const foundCheckOut = checkOutLog
+        ? formatTimeForInput(checkOutLog.timestamp)
+        : ''
+
+      setCheckInTime(foundCheckIn)
+      setCheckOutTime(foundCheckOut)
+
+      setExistingLogsInfo({
+        hasCheckIn: !!foundCheckIn,
+        hasCheckOut: !!foundCheckOut,
+      })
+    } catch (err) {
+      console.error('Error fetching existing logs:', err)
+    } finally {
+      setIsLoadingLogs(false)
+    }
+  }, [selectedEmployeeId, selectedDate])
+
+  useEffect(() => {
+    fetchExistingLogs()
+  }, [fetchExistingLogs])
+
+  // ============================================================
+  // HANDLE REFRESH
+  // ============================================================
+
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return
+    setIsRefreshing(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      await fetchExistingLogs()
+      setSuccess('Attendance data refreshed!')
+      setTimeout(() => setSuccess(''), 2000)
+    } catch (err) {
+      console.error('Refresh error:', err)
+      setError('Failed to refresh data')
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [fetchExistingLogs, isRefreshing])
+
+  // ============================================================
+  // HANDLE SEND OTP
+  // ============================================================
+
+  const handleSendOtp = useCallback(async () => {
+    if (!selectedEmployee) {
+      setError('Please select an employee first.')
+      return
+    }
+    if (isSendingOtp) return
+
+    setIsSendingOtp(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const response = await fetch('/api/hr/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee_id: selectedEmployee.employee_id,
+          employee_name: selectedEmployee.full_name,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        setError(data.message || 'Failed to send verification code.')
         return
       }
-      const data = await res.json()
-      setRecentAttendance(data.records || data.data || [])
-    } catch (err) {
-      console.error('Error fetching attendance:', err)
-      setRecentAttendance([])
-    } finally {
-      setLoadingAttendance(false)
-    }
-  }
 
-  // =====================================================
-  // Submit Manual Punch
-  // =====================================================
-  const handleSubmitPunch = async (e: React.FormEvent) => {
+      setOtpSentTo(data.email_masked || '')
+      setSuccess(data.message || 'Verification code sent to HR email!')
+      setOtpCountdown(60)
+
+      setTimeout(() => setSuccess(''), 4000)
+    } catch (err) {
+      console.error('Send OTP error:', err)
+      setError('Failed to send verification code.')
+    } finally {
+      setIsSendingOtp(false)
+    }
+  }, [selectedEmployee, isSendingOtp])
+
+  // ============================================================
+  // HANDLE SUBMIT — OTP required
+  // ============================================================
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setSuccess('')
 
-    if (!punchForm.employeeId) {
-      setError('Please select an employee first')
-      return
-    }
-    if (!punchForm.branch) {
-      setError('Branch is required')
-      return
-    }
-    if (!punchForm.punchType) {
-      setError('Please select punch type (Check In / Check Out)')
-      return
-    }
-    if (!punchForm.punchDate || !punchForm.punchTime) {
-      setError('Please select date and time')
+    if (!selectedEmployee) {
+      setError('Please select an employee ID')
       return
     }
 
-    setSubmitting(true)
+    if (!selectedDate) {
+      setError('Please select a date')
+      return
+    }
+
+    if (!otpCode || otpCode.trim().length !== 6) {
+      setError('Please enter the 6-digit verification code sent to HR email.')
+      return
+    }
+
+    const canSubmitCheckIn =
+      !existingLogsInfo.hasCheckIn && checkInTime.trim() !== ''
+    const canSubmitCheckOut =
+      !existingLogsInfo.hasCheckOut && checkOutTime.trim() !== ''
+
+    if (!canSubmitCheckIn && !canSubmitCheckOut) {
+      if (existingLogsInfo.hasCheckIn && existingLogsInfo.hasCheckOut) {
+        setError('Both Check In and Check Out already exist for this date.')
+      } else {
+        setError('Please enter a time for the empty field.')
+      }
+      return
+    }
+
+    setIsLoading(true)
+
     try {
-      const timestamp = new Date(
-        `${punchForm.punchDate}T${punchForm.punchTime}:00`,
-      ).toISOString()
+      const logsToAdd: Array<{
+        user_id: string
+        employee_name: string
+        timestamp: string
+        punch_type: 'CHECK_IN' | 'CHECK_OUT'
+        device_id: string
+        branch_code: string
+      }> = []
 
-      const payload = {
-        user_id: punchForm.employeeId,
-        employee_name: punchForm.employeeName,
-        punch_type: punchForm.punchType,
-        timestamp,
-        device_id: punchForm.deviceId || 'MANUAL_ENTRY',
-        branch_code: punchForm.branch,
+      if (canSubmitCheckIn) {
+        logsToAdd.push({
+          user_id: String(selectedEmployee.employee_id).trim(),
+          employee_name: String(selectedEmployee.full_name).trim(),
+          timestamp: new Date(`${selectedDate}T${checkInTime}:00`).toISOString(),
+          punch_type: 'CHECK_IN',
+          device_id: String(deviceId || 'MANUAL').trim(),
+          branch_code: String(branchCode || 'K').trim(),
+        })
       }
 
-      const res = await fetch('/api/hr/add-attendance', {
+      // ⚠️ Check Out field se bhi CHECK_IN (jaan-boojh kar)
+      if (canSubmitCheckOut) {
+        logsToAdd.push({
+          user_id: String(selectedEmployee.employee_id).trim(),
+          employee_name: String(selectedEmployee.full_name).trim(),
+          timestamp: new Date(`${selectedDate}T${checkOutTime}:00`).toISOString(),
+          punch_type: 'CHECK_IN',
+          device_id: String(deviceId || 'MANUAL').trim(),
+          branch_code: String(branchCode || 'K').trim(),
+        })
+      }
+
+      console.log('📤 Sending logs:', logsToAdd)
+
+      const response = await fetch('/api/hr/add-attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          logs: logsToAdd,
+          otp_code: otpCode.trim(),
+        }),
       })
 
-      const result = await res.json()
+      const data = await response.json()
 
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || 'Failed to add attendance')
+      if (!response.ok || !data.success) {
+        setError(data.message || 'Failed to add attendance logs')
+        setIsLoading(false)
+        return
       }
 
-      setSuccess(
-        `✅ ${punchForm.punchType === 'CHECK_IN' ? 'Check In' : 'Check Out'} recorded for ${punchForm.employeeName}`,
-      )
+      setSuccess(data.message || 'Attendance logs added successfully!')
 
-      fetchRecentAttendance(punchForm.employeeId)
-      setPunchForm((prev) => ({ ...prev, punchType: '' }))
+      // ✅ Clear OTP after success
+      setOtpCode('')
+      setOtpSentTo('')
+      setOtpCountdown(0)
 
-      setTimeout(() => setSuccess(''), 4000)
+      await fetchExistingLogs()
+
+      setTimeout(() => setSuccess(''), 3000)
     } catch (err) {
       console.error('Error adding attendance:', err)
-      setError(err instanceof Error ? err.message : 'Failed to add attendance')
+      setError('An error occurred. Please try again.')
     } finally {
-      setSubmitting(false)
+      setIsLoading(false)
     }
   }
 
-  // =====================================================
-  // Format helpers
-  // =====================================================
-  const formatDateTime = (iso: string) => {
-    const d = new Date(iso)
-    return d.toLocaleString('en-PK', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    })
-  }
+  // ============================================================
+  // RENDER
+  // ============================================================
 
-  // =====================================================
-  // Render
-  // =====================================================
+  const isCheckInLocked = existingLogsInfo.hasCheckIn
+  const isCheckOutLocked = existingLogsInfo.hasCheckOut
+
   return (
     <>
-      <ProtectedRoute allowedUser="hr">
-        <NavbarDropdown />
-        <div className={`min-h-screen bg-gray-50 p-6 ${roboto.className}`}>
-          <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="mb-6">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-[#0071BD] tracking-wider flex items-center gap-3">
-                    <Clock className="w-8 h-8" />
-                    Add Attendance
-                  </h1>
-                  <p className="text-sm text-gray-500 tracking-wide mt-1">
-                    Select an employee and record Check In / Check Out manually
-                  </p>
-                </div>
-                <button
-                  onClick={() => router.push('/hr/dashboard')}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 transition tracking-wider flex items-center gap-2"
-                >
-                  <X className="w-4 h-4" /> Back to Dashboard
-                </button>
-              </div>
+      <NavbarDropdown />
+      <div className={`min-h-screen bg-gray-50 p-6 ${roboto.className}`}>
+        <div className="w-full">
+          {/* HEADER */}
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h1
+                className={`text-3xl font-bold text-[#0071BD] tracking-wider ${roboto.className}`}
+              >
+                Add Attendance
+              </h1>
             </div>
 
-            {/* Alerts */}
-            {error && (
-              <div className="mb-4 p-4 flex items-start gap-3 bg-red-50 border border-red-200">
-                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm text-red-700 tracking-wide">{error}</p>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing || isLoading || !selectedEmployeeId}
+              className={`px-4 py-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center gap-2 tracking-wider text-sm disabled:opacity-50 disabled:cursor-not-allowed ${roboto.className}`}
+              title="Refresh attendance data"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`}
+              />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
+
+          {/* FORM CARD */}
+          <div className="bg-white shadow-sm p-6 md:p-8 mb-6 w-full">
+            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-100">
+              <Plus className="w-5 h-5 text-[#0071BD]" />
+              <h2
+                className={`text-sm font-bold text-gray-800 tracking-wide uppercase ${roboto.className}`}
+              >
+                New Attendance Log
+              </h2>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* ROW 1 */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label
+                    className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 ${roboto.className}`}
+                  >
+                    Employee ID *
+                  </label>
+                  <div className="relative">
+                    <Hash className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    <select
+                      value={selectedEmployeeId}
+                      onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                      disabled={isLoadingEmployees}
+                      className={`w-full pl-10 pr-10 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 appearance-none ${roboto.className}`}
+                    >
+                      <option value="">
+                        {isLoadingEmployees ? 'Loading...' : 'Select ID'}
+                      </option>
+                      {employees.map((emp) => (
+                        <option key={emp.employee_id} value={emp.employee_id}>
+                          {emp.employee_id}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
                 </div>
-                <button
-                  onClick={() => setError('')}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
 
-            {success && (
-              <div className="mb-4 p-4 flex items-start gap-3 bg-green-50 border border-green-200">
-                <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm text-green-700 tracking-wide">{success}</p>
-                </div>
-                <button
-                  onClick={() => setSuccess('')}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-              {/* LEFT: Employee List */}
-              <div className="lg:col-span-2 bg-white shadow-sm">
-                <div className="p-4 border-b border-gray-200">
-                  <h2 className="text-lg font-bold text-gray-800 tracking-wider flex items-center gap-2 mb-3">
-                    <Users className="w-5 h-5 text-[#0071BD]" />
-                    Employees
-                    <span className="text-xs font-normal text-gray-500 ml-auto">
-                      {filteredEmployees.length} found
-                    </span>
-                  </h2>
-
-                  {/* Search */}
-                  <div className="relative mb-3">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <div>
+                  <label
+                    className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 ${roboto.className}`}
+                  >
+                    Full Name
+                  </label>
+                  <div className="relative">
+                    <User className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                     <input
                       type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search by name, ID, dept..."
-                      className="w-full pl-9 pr-4 py-2 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm tracking-wide text-black text-sm"
+                      value={selectedEmployee?.full_name || ''}
+                      readOnly
+                      placeholder="Auto-filled"
+                      className={`w-full pl-10 pr-4 py-3 border border-gray-200 bg-gray-50 text-gray-800 cursor-not-allowed outline-none shadow-sm ${roboto.className}`}
                     />
                   </div>
+                </div>
 
-                  {/* Filters */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="relative">
-                      <Globe className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
-                      <select
-                        value={branchFilter}
-                        onChange={(e) =>
-                          setBranchFilter(e.target.value as 'ALL' | 'K' | 'PQ')
-                        }
-                        className="w-full pl-9 pr-6 py-2 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] outline-none shadow-sm tracking-wide text-black text-sm appearance-none"
-                      >
-                        <option value="ALL">All Branches</option>
-                        <option value="K">Korangi</option>
-                        <option value="PQ">Port Qasim</option>
-                      </select>
-                      <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    </div>
-
-                    <div className="relative">
-                      <Building className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
-                      <select
-                        value={departmentFilter}
-                        onChange={(e) => setDepartmentFilter(e.target.value)}
-                        className="w-full pl-9 pr-6 py-2 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] outline-none shadow-sm tracking-wide text-black text-sm appearance-none"
-                      >
-                        <option value="ALL">All Depts</option>
-                        {departments.map((d) => (
-                          <option key={d} value={d}>
-                            {d}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    </div>
+                <div>
+                  <label
+                    className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 ${roboto.className}`}
+                  >
+                    Department
+                  </label>
+                  <div className="relative">
+                    <Building className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={selectedEmployee?.department || ''}
+                      readOnly
+                      placeholder="Auto-filled"
+                      className={`w-full pl-10 pr-4 py-3 border border-gray-200 bg-gray-50 text-gray-800 cursor-not-allowed outline-none shadow-sm ${roboto.className}`}
+                    />
                   </div>
                 </div>
 
-                {/* Employee List */}
-                <div className="max-h-[600px] overflow-y-auto">
-                  {loadingEmployees ? (
-                    <div className="p-8 text-center">
-                      <RefreshCw className="w-6 h-6 animate-spin text-[#0071BD] mx-auto mb-2" />
-                      <p className="text-sm text-gray-500 tracking-wide">
-                        Loading employees...
-                      </p>
-                    </div>
-                  ) : employeeError ? (
-                    <div className="p-8 text-center">
-                      <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                      <p className="text-sm text-red-600 tracking-wide mb-3">
-                        {employeeError}
-                      </p>
-                      <button
-                        onClick={fetchEmployees}
-                        className="px-4 py-2 bg-[#0071BD] text-white text-sm hover:bg-[#005a96] tracking-wide"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  ) : filteredEmployees.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                      <p className="text-sm text-gray-400 tracking-wide">
-                        No employees found
-                      </p>
-                    </div>
-                  ) : (
-                    filteredEmployees.map((emp) => {
-                      const isSelected = selectedEmployee?.employeeId === emp.employeeId
-                      return (
-                        <button
-                          key={emp.employeeId}
-                          onClick={() => handleSelectEmployee(emp)}
-                          className={`w-full text-left p-3 border-b border-gray-100 transition hover:bg-blue-50 ${
-                            isSelected ? 'bg-blue-50 border-l-4 border-l-[#0071BD]' : ''
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div
-                              className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                isSelected
-                                  ? 'bg-[#0071BD] text-white'
-                                  : 'bg-gray-100 text-gray-600'
-                              }`}
-                            >
-                              <User className="w-5 h-5" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-800 tracking-wide text-sm truncate">
-                                {emp.fullName}
-                              </p>
-                              <p className="text-xs text-gray-500 tracking-wide truncate">
-                                ID: {emp.employeeId}
-                              </p>
-                              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                {emp.department && (
-                                  <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
-                                    {emp.department}
-                                  </span>
-                                )}
-                                <span
-                                  className={`text-xs px-2 py-0.5 rounded font-medium ${
-                                    emp.source === 'PQ'
-                                      ? 'bg-purple-100 text-purple-700'
-                                      : 'bg-blue-100 text-blue-700'
-                                  }`}
-                                >
-                                  {emp.source === 'PQ' ? 'Port Qasim' : 'Korangi'}
-                                </span>
-                              </div>
-                            </div>
-                            {isSelected && (
-                              <BadgeCheck className="w-5 h-5 text-[#0071BD] flex-shrink-0" />
-                            )}
-                          </div>
-                        </button>
-                      )
-                    })
+                <div>
+                  <label
+                    className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 ${roboto.className}`}
+                  >
+                    Designation
+                  </label>
+                  <div className="relative">
+                    <Briefcase className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={selectedEmployee?.position || ''}
+                      readOnly
+                      placeholder="Auto-filled"
+                      className={`w-full pl-10 pr-4 py-3 border border-gray-200 bg-gray-50 text-gray-800 cursor-not-allowed outline-none shadow-sm ${roboto.className}`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ✅ ROW 2 — Date + Day + Check In + Check Out */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label
+                    className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 ${roboto.className}`}
+                  >
+                    Date *
+                  </label>
+                  <div className="relative">
+                    <Calendar className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className={`w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 ${roboto.className}`}
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+
+                {/* ✅ NEW: DAY (auto from date) */}
+                <div>
+                  <label
+                    className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 flex items-center gap-1.5 ${roboto.className}`}
+                  >
+                    <CalendarDays className="w-4 h-4 text-[#0071BD]" />
+                    Day
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded tracking-wide uppercase">
+                      auto
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <CalendarDays className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={dayName}
+                      readOnly
+                      placeholder="Auto-filled"
+                      className={`w-full pl-10 pr-4 py-3 border border-gray-200 bg-gray-50 text-gray-800 cursor-not-allowed outline-none shadow-sm font-medium ${roboto.className}`}
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1 tracking-wide">
+                    Auto-calculated from selected date
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 flex items-center gap-1.5 ${roboto.className}`}
+                  >
+                    <LogIn className="w-4 h-4 text-green-600" />
+                    Check In Time
+                    {isLoadingLogs && (
+                      <Loader className="w-3 h-3 animate-spin text-gray-400" />
+                    )}
+                    {isCheckInLocked && !isLoadingLogs && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded tracking-wide flex items-center gap-0.5">
+                        <Lock className="w-2.5 h-2.5" />
+                        exists
+                      </span>
+                    )}
+                  </label>
+                  <div className="relative">
+                    <Clock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="time"
+                      value={checkInTime}
+                      onChange={(e) => setCheckInTime(e.target.value)}
+                      readOnly={isCheckInLocked}
+                      className={`w-full pl-10 pr-4 py-3 border outline-none shadow-sm ${
+                        isCheckInLocked
+                          ? 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed'
+                          : 'border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white text-gray-900'
+                      } ${roboto.className}`}
+                      disabled={isLoading || isCheckInLocked}
+                    />
+                  </div>
+                  {isCheckInLocked && (
+                    <p className="text-[10px] text-gray-500 mt-1 tracking-wide">
+                      Check In already exists — cannot be changed
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 flex items-center gap-1.5 ${roboto.className}`}
+                  >
+                    <LogOut className="w-4 h-4 text-red-600" />
+                    Check Out Time
+                    {isLoadingLogs && (
+                      <Loader className="w-3 h-3 animate-spin text-gray-400" />
+                    )}
+                    {isCheckOutLocked && !isLoadingLogs && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded tracking-wide flex items-center gap-0.5">
+                        <Lock className="w-2.5 h-2.5" />
+                        exists
+                      </span>
+                    )}
+                  </label>
+                  <div className="relative">
+                    <Clock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="time"
+                      value={checkOutTime}
+                      onChange={(e) => setCheckOutTime(e.target.value)}
+                      readOnly={isCheckOutLocked}
+                      className={`w-full pl-10 pr-4 py-3 border outline-none shadow-sm ${
+                        isCheckOutLocked
+                          ? 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed'
+                          : 'border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white text-gray-900'
+                      } ${roboto.className}`}
+                      disabled={isLoading || isCheckOutLocked}
+                    />
+                  </div>
+                  {isCheckOutLocked && (
+                    <p className="text-[10px] text-gray-500 mt-1 tracking-wide">
+                      Check Out already exists — cannot be changed
+                    </p>
                   )}
                 </div>
               </div>
 
-              {/* RIGHT: Punch Form + Recent Attendance */}
-              <div className="lg:col-span-3 space-y-6">
-                {/* Punch Form */}
-                <div className="bg-white shadow-sm">
-                  <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-[#0071BD] to-[#005a96]">
-                    <h2 className="text-lg font-bold text-white tracking-wider flex items-center gap-2">
-                      <Timer className="w-5 h-5" />
-                      Record Attendance
-                    </h2>
+              {/* ROW 3 — Branch + Device + Branch Code */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label
+                    className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 flex items-center gap-1.5 ${roboto.className}`}
+                  >
+                    <MapPin className="w-4 h-4 text-[#0071BD]" />
+                    Branch *
+                  </label>
+                  <div className="relative">
+                    <MapPin className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    <select
+                      value={selectedBranch}
+                      onChange={(e) =>
+                        handleBranchChange(e.target.value as BranchValue)
+                      }
+                      className={`w-full pl-10 pr-10 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 appearance-none font-medium ${roboto.className}`}
+                      disabled={isLoading}
+                    >
+                      {BRANCH_OPTIONS.map((b) => (
+                        <option key={b.value} value={b.value}>
+                          {b.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
                   </div>
-
-                  {!selectedEmployee ? (
-                    <div className="p-12 text-center">
-                      <User className="w-16 h-16 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500 tracking-wide">
-                        Select an employee from the list to record attendance
-                      </p>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleSubmitPunch} className="p-6">
-                      {/* Selected Employee Info */}
-                      <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-[#0071BD] text-white flex items-center justify-center">
-                            <User className="w-6 h-6" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-bold text-gray-800 tracking-wide">
-                              {selectedEmployee.fullName}
-                            </p>
-                            <p className="text-sm text-gray-600 tracking-wide">
-                              ID: {selectedEmployee.employeeId}
-                              {selectedEmployee.position &&
-                                ` • ${selectedEmployee.position}`}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedEmployee(null)
-                              setRecentAttendance([])
-                            }}
-                            className="text-gray-400 hover:text-red-500"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Branch (auto-selected) */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 tracking-wide mb-1">
-                            Branch *
-                          </label>
-                          <div className="relative">
-                            <Globe className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                            <select
-                              value={punchForm.branch}
-                              onChange={(e) =>
-                                setPunchForm({
-                                  ...punchForm,
-                                  branch: e.target.value as 'K' | 'PQ',
-                                })
-                              }
-                              className="w-full pl-10 pr-4 py-2 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] outline-none shadow-sm tracking-wide text-black bg-green-50"
-                            >
-                              <option value="">Select Branch</option>
-                              <option value="K">Korangi</option>
-                              <option value="PQ">Port Qasim</option>
-                            </select>
-                          </div>
-                          <p className="text-xs text-green-600 mt-1 tracking-wide flex items-center gap-1">
-                            <Check className="w-3 h-3" /> Auto-selected from employee
-                          </p>
-                        </div>
-
-                        {/* Punch Type */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 tracking-wide mb-1">
-                            Punch Type *
-                          </label>
-                          <div className="relative">
-                            <Clock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                            <select
-                              value={punchForm.punchType}
-                              onChange={(e) =>
-                                setPunchForm({
-                                  ...punchForm,
-                                  punchType: e.target.value as
-                                    | 'CHECK_IN'
-                                    | 'CHECK_OUT',
-                                })
-                              }
-                              className="w-full pl-10 pr-4 py-2 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] outline-none shadow-sm tracking-wide text-black"
-                            >
-                              <option value="">Select Type</option>
-                              <option value="CHECK_IN">Check In</option>
-                              {punchForm.branch === 'K' && (
-                                <option value="CHECK_OUT">Check Out</option>
-                              )}
-                            </select>
-                          </div>
-                          {punchForm.branch === 'PQ' && (
-                            <p className="text-xs text-purple-600 mt-1 tracking-wide">
-                              Port Qasim only supports Check In
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Date */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 tracking-wide mb-1">
-                            Date *
-                          </label>
-                          <div className="relative">
-                            <Calendar className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                            <input
-                              type="date"
-                              value={punchForm.punchDate}
-                              onChange={(e) =>
-                                setPunchForm({
-                                  ...punchForm,
-                                  punchDate: e.target.value,
-                                })
-                              }
-                              className="w-full pl-10 pr-4 py-2 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] outline-none shadow-sm tracking-wide text-black"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Time */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 tracking-wide mb-1">
-                            Time *
-                          </label>
-                          <div className="relative">
-                            <Timer className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                            <input
-                              type="time"
-                              value={punchForm.punchTime}
-                              onChange={(e) =>
-                                setPunchForm({
-                                  ...punchForm,
-                                  punchTime: e.target.value,
-                                })
-                              }
-                              className="w-full pl-10 pr-4 py-2 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] outline-none shadow-sm tracking-wide text-black"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Device ID */}
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 tracking-wide mb-1">
-                            Device ID
-                          </label>
-                          <input
-                            type="text"
-                            value={punchForm.deviceId}
-                            onChange={(e) =>
-                              setPunchForm({
-                                ...punchForm,
-                                deviceId: e.target.value,
-                              })
-                            }
-                            className="w-full px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] outline-none shadow-sm tracking-wide text-black"
-                            placeholder="MANUAL_ENTRY"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Quick action buttons */}
-                      <div className="mt-6 grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPunchForm({
-                              ...punchForm,
-                              punchType: 'CHECK_IN',
-                              punchDate: new Date().toISOString().split('T')[0],
-                              punchTime: new Date().toTimeString().slice(0, 5),
-                            })
-                          }
-                          className={`px-4 py-3 flex items-center justify-center gap-2 tracking-wider font-medium transition border-2 ${
-                            punchForm.punchType === 'CHECK_IN'
-                              ? 'bg-green-600 text-white border-green-600'
-                              : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
-                          }`}
-                        >
-                          <LogIn className="w-5 h-5" />
-                          Quick Check In
-                        </button>
-                        {punchForm.branch !== 'PQ' && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPunchForm({
-                                ...punchForm,
-                                punchType: 'CHECK_OUT',
-                                punchDate: new Date().toISOString().split('T')[0],
-                                punchTime: new Date().toTimeString().slice(0, 5),
-                              })
-                            }
-                            className={`px-4 py-3 flex items-center justify-center gap-2 tracking-wider font-medium transition border-2 ${
-                              punchForm.punchType === 'CHECK_OUT'
-                                ? 'bg-orange-600 text-white border-orange-600'
-                                : 'bg-white text-orange-700 border-orange-300 hover:bg-orange-50'
-                            }`}
-                          >
-                            <LogOut className="w-5 h-5" />
-                            Quick Check Out
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Submit */}
-                      <button
-                        type="submit"
-                        disabled={submitting || !punchForm.punchType}
-                        className="w-full mt-4 px-6 py-3 bg-[#0071BD] text-white hover:bg-[#005a96] transition flex items-center justify-center gap-2 tracking-wider font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {submitting ? (
-                          <RefreshCw className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <Save className="w-5 h-5" />
-                        )}
-                        {submitting ? 'Saving...' : 'Save Attendance Record'}
-                      </button>
-                    </form>
-                  )}
+                  <p className="text-[10px] text-gray-500 mt-1 tracking-wide">
+                    Select branch to auto-fill Device ID and Branch Code
+                  </p>
                 </div>
 
-                {/* Recent Attendance */}
-                {selectedEmployee && (
-                  <div className="bg-white shadow-sm">
-                    <div className="p-4 border-b border-gray-200">
-                      <h3 className="text-md font-bold text-gray-800 tracking-wider flex items-center gap-2">
-                        <History className="w-5 h-5 text-[#0071BD]" />
-                        Recent Attendance
-                        <span className="text-xs font-normal text-gray-500 ml-auto">
-                          Last 10 records
-                        </span>
-                      </h3>
-                    </div>
+                <div>
+                  <label
+                    className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 flex items-center gap-1.5 ${roboto.className}`}
+                  >
+                    Device ID *
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded tracking-wide uppercase">
+                      auto
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <Hash className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={deviceId}
+                      readOnly
+                      className={`w-full pl-10 pr-4 py-3 border border-gray-200 bg-gray-50 text-gray-800 cursor-not-allowed outline-none shadow-sm font-medium ${roboto.className}`}
+                    />
+                  </div>
+                </div>
 
-                    <div className="p-4">
-                      {loadingAttendance ? (
-                        <div className="text-center py-6">
-                          <RefreshCw className="w-5 h-5 animate-spin text-[#0071BD] mx-auto mb-2" />
-                          <p className="text-sm text-gray-500 tracking-wide">
-                            Loading...
-                          </p>
-                        </div>
-                      ) : recentAttendance.length === 0 ? (
-                        <div className="text-center py-6">
-                          <History className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                          <p className="text-sm text-gray-400 tracking-wide">
-                            No attendance records found
-                          </p>
-                        </div>
+                <div>
+                  <label
+                    className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 flex items-center gap-1.5 ${roboto.className}`}
+                  >
+                    Branch Code *
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded tracking-wide uppercase">
+                      auto
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <MapPin className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={branchCode}
+                      readOnly
+                      className={`w-full pl-10 pr-4 py-3 border border-gray-200 bg-gray-50 text-gray-800 cursor-not-allowed outline-none shadow-sm font-medium ${roboto.className}`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ✅ ROW 4 — HR EMAIL VERIFICATION */}
+              <div className="bg-blue-50 border border-blue-200 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <ShieldCheck className="w-4 h-4 text-[#0071BD]" />
+                  <h3
+                    className={`text-xs font-bold text-gray-800 tracking-wide uppercase ${roboto.className}`}
+                  >
+                    HR Email Verification Required
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label
+                      className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 ${roboto.className}`}
+                    >
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={
+                        isSendingOtp ||
+                        isLoading ||
+                        !selectedEmployee ||
+                        otpCountdown > 0
+                      }
+                      className={`w-full py-3 border transition flex items-center justify-center gap-2 tracking-wider text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                        otpSentTo
+                          ? 'border-green-300 bg-green-50 text-green-700'
+                          : 'border-[#0071BD] bg-white text-[#0071BD] hover:bg-blue-50'
+                      } ${roboto.className}`}
+                    >
+                      {isSendingOtp ? (
+                        <>
+                          <Loader className="w-4 h-4 animate-spin" />
+                          <span>Sending...</span>
+                        </>
+                      ) : otpCountdown > 0 ? (
+                        <>
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Resend in {otpCountdown}s</span>
+                        </>
+                      ) : otpSentTo ? (
+                        <>
+                          <RefreshCw className="w-4 h-4" />
+                          <span>Resend Code</span>
+                        </>
                       ) : (
-                        <div className="space-y-2">
-                          {recentAttendance.map((rec) => (
-                            <div
-                              key={rec.id}
-                              className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-100"
-                            >
-                              <div
-                                className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                  rec.punch_type === 'CHECK_IN'
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-orange-100 text-orange-700'
-                                }`}
-                              >
-                                {rec.punch_type === 'CHECK_IN' ? (
-                                  <LogIn className="w-4 h-4" />
-                                ) : (
-                                  <LogOut className="w-4 h-4" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p
-                                  className={`text-sm font-medium tracking-wide ${
-                                    rec.punch_type === 'CHECK_IN'
-                                      ? 'text-green-700'
-                                      : 'text-orange-700'
-                                  }`}
-                                >
-                                  {rec.punch_type === 'CHECK_IN'
-                                    ? 'Check In'
-                                    : 'Check Out'}
-                                </p>
-                                <p className="text-xs text-gray-500 tracking-wide">
-                                  {formatDateTime(rec.timestamp)}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-xs text-gray-400 tracking-wide">
-                                  {rec.branch_code || '-'}
-                                </p>
-                                <p className="text-xs text-gray-400 tracking-wide">
-                                  {rec.device_id || '-'}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        <>
+                          <Mail className="w-4 h-4" />
+                          <span>Send Code to HR Email</span>
+                        </>
                       )}
-                    </div>
+                    </button>
+                    {otpSentTo && (
+                      <p className="text-[10px] text-green-600 mt-1 tracking-wide">
+                        Code sent to HR: {otpSentTo}
+                      </p>
+                    )}
                   </div>
-                )}
+
+                  <div className="md:col-span-2">
+                    <label
+                      className={`block text-sm font-medium text-gray-700 tracking-wide mb-2 flex items-center gap-1.5 ${roboto.className}`}
+                    >
+                      
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={(e) =>
+                          setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                        }
+                        placeholder="● ● ● ● ● ●"
+                        className={`w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 tracking-[0.5em] font-bold text-lg text-center ${roboto.className}`}
+                        disabled={isLoading}
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1 tracking-wide">
+                      Code expires in 10 minutes. Check HR email inbox (and spam folder).
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
+
+              {/* ERROR / SUCCESS */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 p-3 flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <p
+                    className={`text-sm text-red-700 tracking-wide ${roboto.className}`}
+                  >
+                    {error}
+                  </p>
+                </div>
+              )}
+
+              {success && (
+                <div className="bg-green-50 border border-green-200 p-3 flex items-start gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <p
+                    className={`text-sm text-green-700 tracking-wide ${roboto.className}`}
+                  >
+                    {success}
+                  </p>
+                </div>
+              )}
+
+              {/* BUTTONS */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  disabled={isLoading}
+                  className={`flex-1 py-3 border border-gray-300 text-gray-700 hover:bg-gray-50 transition tracking-wider disabled:opacity-50 disabled:cursor-not-allowed ${roboto.className}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    isLoading ||
+                    !selectedEmployee ||
+                    otpCode.trim().length !== 6
+                  }
+                  className={`flex-1 py-3 bg-[#0071BD] text-white hover:bg-[#005a96] transition flex items-center justify-center gap-2 tracking-wider disabled:opacity-50 disabled:cursor-not-allowed ${roboto.className}`}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader className="w-5 h-5 animate-spin" />
+                      <span className={roboto.className}>Verifying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle className="w-4 h-4" />
+                      <span className={roboto.className}>Add Attendance</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-        <Footer />
-      </ProtectedRoute>
+      </div>
+      <Footer />
     </>
   )
 }
