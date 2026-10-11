@@ -26,6 +26,16 @@ type PunchType = (typeof VALID_PUNCH_TYPES)[number]
 const VALID_BRANCH_CODES = ['K', 'PQ'] as const
 
 // ============================================================
+// ✅ ADMIN-CONTROLLED BRANCH CONFIG
+//    (Backend decides; frontend cannot override)
+// ============================================================
+
+const ADMIN_BRANCH_CONFIG: Record<string, { branch_code: 'K' | 'PQ'; device_id: string }> = {
+  K: { branch_code: 'K', device_id: 'K-01' },
+  PQ: { branch_code: 'PQ', device_id: 'PQ-01' },
+}
+
+// ============================================================
 // BRANCH → TABLE MAPPING
 // ============================================================
 
@@ -73,7 +83,6 @@ const verifyOTP = async (
     return { valid: false, message: 'Verification code has expired.' }
   }
 
-  // Mark as used
   await supabaseAdmin
     .from('attendance_otps')
     .update({ used: true })
@@ -116,7 +125,7 @@ export async function POST(req: Request) {
     }
 
     // ========================================================
-    // ✅ OTP VERIFY
+    // OTP VERIFY
     // ========================================================
 
     const employeeId = String(logs[0]?.user_id || '').trim()
@@ -139,7 +148,51 @@ export async function POST(req: Request) {
     console.log('✅ OTP verified for', employeeId)
 
     // ========================================================
+    // ✅ FETCH EMPLOYEE (to determine SOURCE → branch/device)
+    // ========================================================
+
+    const uniqueUserIds = [...new Set(logs.map((l: any) => String(l.user_id || '').trim()))]
+
+    const { data: employees, error: empError } = await supabaseAdmin
+      .from('employees')
+      .select('employee_id, full_name, source')
+      .in('employee_id', uniqueUserIds)
+
+    if (empError) {
+      console.error('Employee lookup error:', empError)
+      return NextResponse.json(
+        { success: false, message: 'Unable to verify employee.' },
+        { status: 500 }
+      )
+    }
+
+    const employeeMap = new Map<string, { full_name: string; source: 'K' | 'PQ' }>()
+
+    ;(employees || []).forEach((e: any) => {
+      const empId = String(e.employee_id || '').trim()
+      const src: 'K' | 'PQ' = e.source === 'PQ' ? 'PQ' : 'K'
+      employeeMap.set(empId, {
+        full_name: String(e.full_name || ''),
+        source: src,
+      })
+    })
+
+    const missingIds = uniqueUserIds.filter(id => !employeeMap.has(id))
+
+    if (missingIds.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Employee not found: ${missingIds.join(', ')}`,
+        },
+        { status: 404 }
+      )
+    }
+
+    // ========================================================
     // PREPARE + VALIDATE EACH LOG
+    //   ✅ device_id / branch_code IGNORED from frontend
+    //   ✅ Derived from employee.source (admin-controlled)
     // ========================================================
 
     const preparedLogs: Array<{
@@ -158,8 +211,6 @@ export async function POST(req: Request) {
         employee_name,
         timestamp,
         punch_type,
-        device_id,
-        branch_code,
       } = log
 
       if (!user_id || typeof user_id !== 'string') {
@@ -197,73 +248,34 @@ export async function POST(req: Request) {
         )
       }
 
-      const finalBranchCode = branch_code || 'K'
-      if (!VALID_BRANCH_CODES.includes(finalBranchCode as any)) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Invalid branch code: ${finalBranchCode}. Must be K or PQ.`,
-          },
-          { status: 400 }
-        )
-      }
+      // ✅ SERVER-SIDE derive branch & device from employee.source
+      const uid = String(user_id).trim()
+      const emp = employeeMap.get(uid)!
+      const adminConfig = ADMIN_BRANCH_CONFIG[emp.source] || ADMIN_BRANCH_CONFIG.K
 
-      const finalDeviceId =
-        typeof device_id === 'string' && device_id.trim()
-          ? device_id.trim()
-          : 'MANUAL'
+      const finalBranchCode = adminConfig.branch_code
+      const finalDeviceId = adminConfig.device_id
+
+      console.log(
+        `🔒 Server-derived: user=${uid}, source=${emp.source} → branch=${finalBranchCode}, device=${finalDeviceId}`
+      )
 
       const rawLogKey =
-        `HR_MANUAL_${user_id}_${punch_type}_${parsedDate.getTime()}_` +
+        `HR_MANUAL_${uid}_${punch_type}_${parsedDate.getTime()}_` +
         Math.random().toString(36).substring(2, 10)
 
       preparedLogs.push({
-        user_id: user_id.trim(),
+        user_id: uid,
         employee_name:
           typeof employee_name === 'string' && employee_name.trim()
             ? employee_name.trim()
-            : null,
+            : emp.full_name || null,
         timestamp: parsedDate.toISOString(),
         punch_type: punch_type as PunchType,
         device_id: finalDeviceId,
         branch_code: finalBranchCode,
         raw_log_key: rawLogKey,
       })
-    }
-
-    // ========================================================
-    // VERIFY ALL EMPLOYEES EXIST
-    // ========================================================
-
-    const uniqueUserIds = [...new Set(preparedLogs.map((l) => l.user_id))]
-
-    const { data: employees, error: empError } = await supabaseAdmin
-      .from('employees')
-      .select('employee_id, full_name')
-      .in('employee_id', uniqueUserIds)
-
-    if (empError) {
-      console.error('Employee lookup error:', empError)
-      return NextResponse.json(
-        { success: false, message: 'Unable to verify employee.' },
-        { status: 500 }
-      )
-    }
-
-    const foundIds = new Set(
-      (employees || []).map((e) => String(e.employee_id).trim())
-    )
-
-    const missingIds = uniqueUserIds.filter((id) => !foundIds.has(id.trim()))
-
-    if (missingIds.length > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Employee not found: ${missingIds.join(', ')}`,
-        },
-        { status: 404 }
-      )
     }
 
     // ========================================================
