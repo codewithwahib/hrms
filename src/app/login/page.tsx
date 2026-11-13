@@ -850,21 +850,21 @@ export default function HRLoginPage() {
         <div className="flex-[1.2] flex flex-col justify-center py-8 px-6 sm:px-10 lg:px-12">
           <div className="mx-auto w-full max-w-xs sm:max-w-sm">
             
-            {/* Logo */}
-            <div className="mb-8 flex items-center">
+            {/* Logo - Centered */}
+            <div className="mb-8 flex justify-center items-center">
               <div className="relative w-64 h-16">
                 <Image
                   src="/logo.png"
                   alt="Company Logo"
                   fill
-                  className="object-contain object-left"
+                  className="object-contain"
                   priority
                 />
               </div>
             </div>
 
-            {/* Header */}
-            <div>
+            {/* Header - Centered */}
+            <div className="text-center">
               <h2 className="text-2xl font-bold text-gray-900 tracking-wider">
                 HR Login
               </h2>
