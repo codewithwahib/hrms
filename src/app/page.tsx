@@ -1,421 +1,16 @@
-// // // 'use client'
-
-// // // import { useState, useEffect } from 'react'
-// // // import { useRouter } from 'next/navigation'
-// // // import Link from 'next/link'
-// // // import Image from 'next/image'
-// // // import { Roboto } from 'next/font/google'
-// // // import { Loader, AlertCircle, User, Lock, Building, ArrowRight, Calendar, Clock, Eye, EyeOff } from 'lucide-react'
-
-// // // const roboto = Roboto({
-// // //   weight: ['100', '300', '400', '500', '700', '900'],
-// // //   style: ['normal', 'italic'],
-// // //   subsets: ['latin'],
-// // //   display: 'swap',
-// // // })
-
-// // // export default function EmployeeLoginPage() {
-// // //   const router = useRouter()
-// // //   const [username, setUsername] = useState('')
-// // //   const [password, setPassword] = useState('')
-// // //   const [error, setError] = useState('')
-// // //   const [isLoading, setIsLoading] = useState(false)
-// // //   const [showPassword, setShowPassword] = useState(false)
-
-// // //   // Check if already logged in
-// // //   useEffect(() => {
-// // //     const employeeData = localStorage.getItem('employeeData')
-// // //     if (employeeData) {
-// // //       try {
-// // //         const data = JSON.parse(employeeData)
-// // //         if (data.employeeId) {
-// // //           router.push(`/dashboard/${data.employeeId}`)
-// // //         }
-// // //       } catch (e) {
-// // //         console.error('Error parsing employee data:', e)
-// // //       }
-// // //     }
-// // //   }, [router])
-
-// // //   const handleSubmit = async (e: React.FormEvent) => {
-// // //     e.preventDefault()
-// // //     setError('')
-// // //     setIsLoading(true)
-
-// // //     try {
-// // //       const response = await fetch('/api/auth/employee-login', {
-// // //         method: 'POST',
-// // //         headers: {
-// // //           'Content-Type': 'application/json',
-// // //         },
-// // //         body: JSON.stringify({ username, password }),
-// // //       })
-
-// // //       const data = await response.json()
-
-// // //       if (!response.ok || !data.success) {
-// // //         setError('Invalid username or password')
-// // //         setIsLoading(false)
-// // //         return
-// // //       }
-
-// // //       // Save employee data to localStorage
-// // //       localStorage.setItem('employeeData', JSON.stringify({
-// // //         employeeId: data.employeeId,
-// // //         fullName: data.fullName,
-// // //         department: data.department,
-// // //         position: data.position,
-// // //         role: 'employee',
-// // //         loginTime: new Date().toISOString()
-// // //       }))
-
-// // //       // Redirect to employee dashboard
-// // //       router.push(`/dashboard/${data.employeeId}`)
-      
-// // //     } catch (err) {
-// // //       setError('An error occurred. Please try again.')
-// // //       console.error('Login error:', err)
-// // //     } finally {
-// // //       setIsLoading(false)
-// // //     }
-// // //   }
-
-// // //   return (
-// // //     <div className={`min-h-screen bg-gray-50 flex items-center justify-center p-4 ${roboto.className}`}>
-// // //       <div className="max-w-md w-full">
-// // //         {/* Logo & Header */}
-// // //         <div className="text-center mb-8">
-// // //           <div className="flex justify-center mb-4">
-// // //             <div className="relative w-56 h-28">
-// // //               <Image
-// // //                 src="/logo.png"
-// // //                 alt="Company Logo"
-// // //                 fill
-// // //                 className="object-contain"
-// // //                 priority
-// // //               />
-// // //             </div>
-// // //           </div>
-// // //           <h1 className="text-3xl font-bold text-[#0071BD] tracking-wider">
-// // //             Employee Login
-// // //           </h1>
-// // //         </div>
-
-// // //         {/* Login Card */}
-// // //         <div className="bg-white shadow-sm p-6 md:p-8">
-// // //           <form onSubmit={handleSubmit} className="space-y-6">
-// // //             {/* Username Field */}
-// // //             <div>
-// // //               <label className="block text-sm font-medium text-gray-700 tracking-wide mb-2">
-// // //                 Username
-// // //               </label>
-// // //               <div className="relative">
-// // //                 <User className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-// // //                 <input
-// // //                   type="text"
-// // //                   value={username}
-// // //                   onChange={(e) => setUsername(e.target.value)}
-// // //                   className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 placeholder-gray-400"
-// // //                   placeholder="Enter your username"
-// // //                   required
-// // //                   disabled={isLoading}
-// // //                 />
-// // //               </div>
-// // //             </div>
-
-// // //             {/* Password Field with Eye Button */}
-// // //             <div>
-// // //               <label className="block text-sm font-medium text-gray-700 tracking-wide mb-2">
-// // //                 Password
-// // //               </label>
-// // //               <div className="relative">
-// // //                 <Lock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-// // //                 <input
-// // //                   type={showPassword ? 'text' : 'password'}
-// // //                   value={password}
-// // //                   onChange={(e) => setPassword(e.target.value)}
-// // //                   className="w-full pl-10 pr-12 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 placeholder-gray-400"
-// // //                   placeholder="Enter your password"
-// // //                   required
-// // //                   disabled={isLoading}
-// // //                 />
-// // //                 <button
-// // //                   type="button"
-// // //                   onClick={() => setShowPassword(!showPassword)}
-// // //                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-// // //                   disabled={isLoading}
-// // //                 >
-// // //                   {showPassword ? (
-// // //                     <EyeOff className="w-5 h-5" />
-// // //                   ) : (
-// // //                     <Eye className="w-5 h-5" />
-// // //                   )}
-// // //                 </button>
-// // //               </div>
-// // //             </div>
-
-// // //             {/* Error Message */}
-// // //             {error && (
-// // //               <div className="bg-red-50 border border-red-200 p-3 flex items-start gap-2">
-// // //                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-// // //                 <p className="text-sm text-red-700 tracking-wide">{error}</p>
-// // //               </div>
-// // //             )}
-
-// // //             {/* Submit Button - Now shows loading spinner inside button */}
-// // //             <button
-// // //               type="submit"
-// // //               disabled={isLoading}
-// // //               className="w-full py-3 bg-[#0071BD] text-white hover:bg-[#005a96] transition flex items-center justify-center gap-2 tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-// // //             >
-// // //               {isLoading ? (
-// // //                 <>
-// // //                   <Loader className="w-5 h-5 animate-spin" />
-// // //                   <span>Signing in...</span>
-// // //                 </>
-// // //               ) : (
-// // //                 <>
-// // //                   <span>Sign in</span>
-// // //                   <ArrowRight className="w-4 h-4" />
-// // //                 </>
-// // //               )}
-// // //             </button>
-
-// // //             {/* Footer */}
-// // //             <div className="mt-6 text-center space-y-2">
-// // //               <p className="text-xs text-gray-400 tracking-wide">
-// // //                 © 2026 All rights reserved
-// // //               </p>
-// // //               <p className="text-[11px] text-gray-400 tracking-wide">
-// // //                 System and Software generated by{' '}
-// // //                 <span className="font-medium text-[#0071BD]">Muhammad Hassan Jaffer</span>
-// // //               </p>
-// // //             </div>
-// // //           </form>
-// // //         </div>
-// // //       </div>
-// // //     </div>
-// // //   )
-// // // }
-
-
-// // // app/employee-login/page.tsx
-// // 'use client'
-
-// // import { useState, useEffect } from 'react'
-// // import { useRouter } from 'next/navigation'
-// // import Link from 'next/link'
-// // import Image from 'next/image'
-// // import { Roboto } from 'next/font/google'
-// // import { Loader, AlertCircle, User, Lock, Building, ArrowRight, Calendar, Clock, Eye, EyeOff } from 'lucide-react'
-
-// // const roboto = Roboto({
-// //   weight: ['100', '300', '400', '500', '700', '900'],
-// //   style: ['normal', 'italic'],
-// //   subsets: ['latin'],
-// //   display: 'swap',
-// // })
-
-// // export default function EmployeeLoginPage() {
-// //   const router = useRouter()
-// //   const [username, setUsername] = useState('')
-// //   const [password, setPassword] = useState('')
-// //   const [error, setError] = useState('')
-// //   const [isLoading, setIsLoading] = useState(false)
-// //   const [showPassword, setShowPassword] = useState(false)
-
-// //   // Check if already logged in
-// //   useEffect(() => {
-// //     const employeeData = localStorage.getItem('employeeData')
-// //     if (employeeData) {
-// //       try {
-// //         const data = JSON.parse(employeeData)
-// //         if (data.employeeId) {
-// //           router.push(`/dashboard/${data.employeeId}`)
-// //         }
-// //       } catch (e) {
-// //         console.error('Error parsing employee data:', e)
-// //       }
-// //     }
-// //   }, [router])
-
-// //   const handleSubmit = async (e: React.FormEvent) => {
-// //     e.preventDefault()
-// //     setError('')
-// //     setIsLoading(true)
-
-// //     try {
-// //       const response = await fetch('/api/auth/employee-login', {
-// //         method: 'POST',
-// //         headers: {
-// //           'Content-Type': 'application/json',
-// //         },
-// //         body: JSON.stringify({ username, password }),
-// //       })
-
-// //       const data = await response.json()
-
-// //       if (!response.ok || !data.success) {
-// //         setError(data.message || 'Invalid username or password')
-// //         setIsLoading(false)
-// //         return
-// //       }
-
-// //       // Save employee data to localStorage
-// //       localStorage.setItem('employeeData', JSON.stringify({
-// //         employeeId: data.employeeId,
-// //         fullName: data.fullName,
-// //         department: data.department,
-// //         position: data.position,
-// //         username: data.username,
-// //         role: 'employee',
-// //         loginTime: new Date().toISOString()
-// //       }))
-
-// //       localStorage.setItem('employeeId', data.employeeId)
-
-// //       // Redirect to employee dashboard
-// //       router.push(`/dashboard/${data.employeeId}`)
-      
-// //     } catch (err) {
-// //       setError('An error occurred. Please try again.')
-// //       console.error('Login error:', err)
-// //     } finally {
-// //       setIsLoading(false)
-// //     }
-// //   }
-
-// //   return (
-// //     <div className={`min-h-screen bg-gray-50 flex items-center justify-center p-4 ${roboto.className}`}>
-// //       <div className="max-w-md w-full">
-// //         {/* Logo & Header */}
-// //         <div className="text-center mb-8">
-// //           <div className="flex justify-center mb-4">
-// //             <div className="relative w-56 h-28">
-// //               <Image
-// //                 src="/logo.png"
-// //                 alt="Company Logo"
-// //                 fill
-// //                 className="object-contain"
-// //                 priority
-// //               />
-// //             </div>
-// //           </div>
-// //           <h1 className="text-3xl font-bold text-[#0071BD] tracking-wider">
-// //             Employee Login
-// //           </h1>
-// //         </div>
-
-// //         {/* Login Card */}
-// //         <div className="bg-white shadow-sm p-6 md:p-8">
-// //           <form onSubmit={handleSubmit} className="space-y-6">
-// //             {/* Username Field */}
-// //             <div>
-// //               <label className="block text-sm font-medium text-gray-700 tracking-wide mb-2">
-// //                 Username
-// //               </label>
-// //               <div className="relative">
-// //                 <User className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-// //                 <input
-// //                   type="text"
-// //                   value={username}
-// //                   onChange={(e) => setUsername(e.target.value)}
-// //                   className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 placeholder-gray-400"
-// //                   placeholder="Enter your username"
-// //                   required
-// //                   disabled={isLoading}
-// //                 />
-// //               </div>
-// //             </div>
-
-// //             {/* Password Field with Eye Button */}
-// //             <div>
-// //               <label className="block text-sm font-medium text-gray-700 tracking-wide mb-2">
-// //                 Password
-// //               </label>
-// //               <div className="relative">
-// //                 <Lock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-// //                 <input
-// //                   type={showPassword ? 'text' : 'password'}
-// //                   value={password}
-// //                   onChange={(e) => setPassword(e.target.value)}
-// //                   className="w-full pl-10 pr-12 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 placeholder-gray-400"
-// //                   placeholder="Enter your password"
-// //                   required
-// //                   disabled={isLoading}
-// //                 />
-// //                 <button
-// //                   type="button"
-// //                   onClick={() => setShowPassword(!showPassword)}
-// //                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-// //                   disabled={isLoading}
-// //                 >
-// //                   {showPassword ? (
-// //                     <EyeOff className="w-5 h-5" />
-// //                   ) : (
-// //                     <Eye className="w-5 h-5" />
-// //                   )}
-// //                 </button>
-// //               </div>
-// //             </div>
-
-// //             {/* Error Message */}
-// //             {error && (
-// //               <div className="bg-red-50 border border-red-200 p-3 flex items-start gap-2">
-// //                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-// //                 <p className="text-sm text-red-700 tracking-wide">{error}</p>
-// //               </div>
-// //             )}
-
-// //             {/* Submit Button */}
-// //             <button
-// //               type="submit"
-// //               disabled={isLoading}
-// //               className="w-full py-3 bg-[#0071BD] text-white hover:bg-[#005a96] transition flex items-center justify-center gap-2 tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-// //             >
-// //               {isLoading ? (
-// //                 <>
-// //                   <Loader className="w-5 h-5 animate-spin" />
-// //                   <span>Signing in...</span>
-// //                 </>
-// //               ) : (
-// //                 <>
-// //                   <span>Sign in</span>
-// //                   <ArrowRight className="w-4 h-4" />
-// //                 </>
-// //               )}
-// //             </button>
-
-// //             {/* Footer */}
-// //             <div className="mt-6 text-center space-y-2">
-// //               <p className="text-xs text-gray-400 tracking-wide">
-// //                 © 2026 All rights reserved
-// //               </p>
-// //               <p className="text-[11px] text-gray-400 tracking-wide">
-// //                 System and Software generated by{' '}
-// //                 <span className="font-medium text-[#0071BD]">Muhammad Hassan Jaffer</span>
-// //               </p>
-// //             </div>
-// //           </form>
-// //         </div>
-// //       </div>
-// //     </div>
-// //   )
-// // }
-
-// // app/employee-login/page.tsx
 // 'use client'
 
 // import { useState, useEffect } from 'react'
 // import { useRouter } from 'next/navigation'
-// import Link from 'next/link'
 // import Image from 'next/image'
-// import { Roboto } from 'next/font/google'
-// import { Loader, AlertCircle, User, Lock, Building, ArrowRight, Calendar, Clock, Eye, EyeOff, Mail } from 'lucide-react'
+// import { DM_Sans } from 'next/font/google'
+// // X icon import kiya gaya hai
+// import { Loader, AlertCircle, Eye, EyeOff, Mail, CheckCircle, X } from 'lucide-react'
+// // Social Icons Import
+// import { FaWhatsapp, FaYoutube, FaFacebook, FaInstagram, FaLinkedin } from 'react-icons/fa'
 
-// const roboto = Roboto({
-//   weight: ['100', '300', '400', '500', '700', '900'],
-//   style: ['normal', 'italic'],
+// const dmSans = DM_Sans({
+//   weight: ['400', '500', '700'],
 //   subsets: ['latin'],
 //   display: 'swap',
 // })
@@ -428,7 +23,7 @@
 //   const [isLoading, setIsLoading] = useState(false)
 //   const [showPassword, setShowPassword] = useState(false)
   
-//   // ✅ Forgot Password Modal States
+//   // Forgot Password Modal States
 //   const [showForgotModal, setShowForgotModal] = useState(false)
 //   const [forgotEmail, setForgotEmail] = useState('')
 //   const [forgotError, setForgotError] = useState('')
@@ -483,6 +78,7 @@
 //       }))
 
 //       localStorage.setItem('employeeId', data.employeeId)
+//       localStorage.setItem('employeeUsername', data.username)
 
 //       router.push(`/dashboard/${data.employeeId}`)
       
@@ -494,14 +90,12 @@
 //     }
 //   }
 
-//   // ✅ Forgot Password — Email based
 //   const handleForgotPassword = async (e: React.FormEvent) => {
 //     e.preventDefault()
 //     setForgotError('')
 //     setForgotSuccess('')
 //     setIsForgotLoading(true)
 
-//     // ✅ Basic email validation (client-side)
 //     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 //     if (!emailRegex.test(forgotEmail.trim())) {
 //       setForgotError('Please enter a valid email address.')
@@ -549,212 +143,282 @@
 //   }
 
 //   return (
-//     <div className={`min-h-screen bg-gray-50 flex items-center justify-center p-4 ${roboto.className}`}>
-//       <div className="max-w-md w-full">
-//         {/* Logo & Header */}
-//         <div className="text-center mb-8">
-//           <div className="flex justify-center mb-4">
-//             <div className="relative w-56 h-28">
-//               <Image
-//                 src="/logo.png"
-//                 alt="Company Logo"
-//                 fill
-//                 className="object-contain"
-//                 priority
-//               />
+//     <div className={`min-h-screen bg-white p-4 md:p-8 flex items-center justify-center tracking-wider ${dmSans.className}`}>
+      
+//       {/* Main Card Container - No rounded corners, sharp edges */}
+//       <div className="w-full max-w-4xl bg-white shadow-xl border border-gray-200 overflow-hidden flex">
+        
+//         {/* Left Side - Form Section */}
+//         <div className="flex-1 flex flex-col justify-center py-8 px-6 sm:px-10 lg:px-12">
+//           <div className="mx-auto w-full max-w-xs sm:max-w-sm">
+            
+//             {/* Logo - Size Bara Kiya Gaya Hai */}
+//             <div className="mb-8 flex items-center">
+//               <div className="relative w-64 h-16">
+//                 <Image
+//                   src="/logo.png"
+//                   alt="TheCubeFactory Logo"
+//                   fill
+//                   className="object-contain object-left"
+//                   priority
+//                 />
+//               </div>
+//             </div>
+
+//             {/* Header */}
+//             <div>
+//               <h2 className="text-2xl font-bold text-gray-900 tracking-wider">
+//                 Employee Login
+//               </h2>
+//             </div>
+
+//             <div className="mt-6">
+//               <form onSubmit={handleSubmit} className="space-y-4">
+                
+//                 {/* Username Field - Text Black */}
+//                 <div>
+//                   <label htmlFor="username" className="block text-sm font-medium text-gray-700 tracking-wide">
+//                     Username
+//                   </label>
+//                   <div className="mt-1">
+//                     <input
+//                       id="username"
+//                       name="username"
+//                       type="text"
+//                       autoComplete="username"
+//                       required
+//                       value={username}
+//                       onChange={(e) => setUsername(e.target.value)}
+//                       className="appearance-none block w-full px-3.5 py-2.5 border border-gray-300 shadow-sm placeholder-gray-400 text-black focus:outline-none focus:ring-1 focus:ring-[#0071BD] focus:border-[#0071BD] text-sm transition-colors tracking-wide"
+//                       placeholder="Enter your username"
+//                       disabled={isLoading}
+//                     />
+//                   </div>
+//                 </div>
+
+//                 {/* Password Field - Text Black */}
+//                 <div>
+//                   <label htmlFor="password" className="block text-sm font-medium text-gray-700 tracking-wide">
+//                     Password
+//                   </label>
+//                   <div className="mt-1 relative">
+//                     <input
+//                       id="password"
+//                       name="password"
+//                       type={showPassword ? 'text' : 'password'}
+//                       autoComplete="current-password"
+//                       required
+//                       value={password}
+//                       onChange={(e) => setPassword(e.target.value)}
+//                       className="appearance-none block w-full px-3.5 py-2.5 border border-gray-300 shadow-sm placeholder-gray-400 text-black focus:outline-none focus:ring-1 focus:ring-[#0071BD] focus:border-[#0071BD] text-sm pr-10 transition-colors tracking-wide"
+//                       placeholder="••••••••"
+//                       disabled={isLoading}
+//                     />
+//                     <button
+//                       type="button"
+//                       onClick={() => setShowPassword(!showPassword)}
+//                       className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+//                       disabled={isLoading}
+//                     >
+//                       {showPassword ? (
+//                         <EyeOff className="h-4 w-4" aria-hidden="true" />
+//                       ) : (
+//                         <Eye className="h-4 w-4" aria-hidden="true" />
+//                       )}
+//                     </button>
+//                   </div>
+//                 </div>
+
+//                 {/* Forgot Password */}
+//                 <div className="flex justify-start">
+//                   <div className="text-xs">
+//                     <button
+//                       type="button"
+//                       onClick={() => setShowForgotModal(true)}
+//                       className="font-medium text-[#0071BD] hover:text-[#005a96] hover:underline tracking-wide"
+//                       disabled={isLoading}
+//                     >
+//                       Forgot your password?
+//                     </button>
+//                   </div>
+//                 </div>
+
+//                 {/* Error Message */}
+//                 {error && (
+//                   <div className="bg-red-50 p-2.5 flex items-start gap-2 border border-red-200">
+//                     <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+//                     <p className="text-xs text-red-700 tracking-wide">{error}</p>
+//                   </div>
+//                 )}
+
+//                 {/* Sign In Button */}
+//                 <div className="pt-6">
+//                   <button
+//                     type="submit"
+//                     disabled={isLoading}
+//                     className="w-full flex justify-center py-2.5 px-4 border border-transparent shadow-sm text-sm font-medium text-white bg-[#0071BD] hover:bg-[#005a96] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0071BD] transition-colors disabled:opacity-70 disabled:cursor-not-allowed tracking-wider"
+//                   >
+//                     {isLoading ? (
+//                       <>
+//                         <Loader className="w-4 h-4 animate-spin mr-2" />
+//                         Signing in...
+//                       </>
+//                     ) : (
+//                       'Sign in'
+//                     )}
+//                   </button>
+//                 </div>
+//               </form>
+
+//               {/* Social Media Icons - Lines ke saath, Fixed Brand Colors */}
+//               <div className="mt-8 flex justify-center items-center gap-4">
+//                 {/* Left Line */}
+//                 <div className="h-[1px] bg-gray-300 flex-1"></div>
+                
+//                 {/* Icons (Fixed Colors, No Hover, No Links) */}
+//                 <div className="flex items-center gap-4">
+//                   <div className="text-[#25D366] text-xl cursor-default">
+//                     <FaWhatsapp />
+//                   </div>
+//                   <div className="text-[#FF0000] text-xl cursor-default">
+//                     <FaYoutube />
+//                   </div>
+//                   <div className="text-[#1877F2] text-xl cursor-default">
+//                     <FaFacebook />
+//                   </div>
+//                   <div className="text-[#E4405F] text-xl cursor-default">
+//                     <FaInstagram />
+//                   </div>
+//                   <div className="text-[#0A66C2] text-xl cursor-default">
+//                     <FaLinkedin />
+//                   </div>
+//                 </div>
+                
+//                 {/* Right Line */}
+//                 <div className="h-[1px] bg-gray-300 flex-1"></div>
+//               </div>
+              
 //             </div>
 //           </div>
-//           <h1 className="text-3xl font-bold text-[#0071BD] tracking-wider">
-//             Employee Login
-//           </h1>
 //         </div>
 
-//         {/* Login Card */}
-//         <div className="bg-white shadow-sm p-6 md:p-8">
-//           <form onSubmit={handleSubmit} className="space-y-6">
-//             {/* Username Field */}
-//             <div>
-//               <label className="block text-sm font-medium text-gray-700 tracking-wide mb-2">
-//                 Username
-//               </label>
-//               <div className="relative">
-//                 <User className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-//                 <input
-//                   type="text"
-//                   value={username}
-//                   onChange={(e) => setUsername(e.target.value)}
-//                   className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 placeholder-gray-400"
-//                   placeholder="Enter your username"
-//                   required
-//                   disabled={isLoading}
-//                 />
-//               </div>
-//             </div>
-
-//             {/* Password Field with Eye Button */}
-//             <div>
-//               <label className="block text-sm font-medium text-gray-700 tracking-wide mb-2">
-//                 Password
-//               </label>
-//               <div className="relative">
-//                 <Lock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-//                 <input
-//                   type={showPassword ? 'text' : 'password'}
-//                   value={password}
-//                   onChange={(e) => setPassword(e.target.value)}
-//                   className="w-full pl-10 pr-12 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 placeholder-gray-400"
-//                   placeholder="Enter your password"
-//                   required
-//                   disabled={isLoading}
-//                 />
-//                 <button
-//                   type="button"
-//                   onClick={() => setShowPassword(!showPassword)}
-//                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-//                   disabled={isLoading}
-//                 >
-//                   {showPassword ? (
-//                     <EyeOff className="w-5 h-5" />
-//                   ) : (
-//                     <Eye className="w-5 h-5" />
-//                   )}
-//                 </button>
-//               </div>
-//             </div>
-
-//             {/* ✅ Forgot Your Password Link — LEFT SIDE */}
-//             <div className="flex justify-start">
-//               <button
-//                 type="button"
-//                 onClick={() => setShowForgotModal(true)}
-//                 className="text-sm text-[#0071BD] hover:text-[#005a96] hover:underline transition tracking-wide"
-//                 disabled={isLoading}
-//               >
-//                 Forgot your password?
-//               </button>
-//             </div>
-
-//             {/* Error Message */}
-//             {error && (
-//               <div className="bg-red-50 border border-red-200 p-3 flex items-start gap-2">
-//                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-//                 <p className="text-sm text-red-700 tracking-wide">{error}</p>
-//               </div>
-//             )}
-
-//             {/* Submit Button */}
-//             <button
-//               type="submit"
-//               disabled={isLoading}
-//               className="w-full py-3 bg-[#0071BD] text-white hover:bg-[#005a96] transition flex items-center justify-center gap-2 tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-//             >
-//               {isLoading ? (
-//                 <>
-//                   <Loader className="w-5 h-5 animate-spin" />
-//                   <span>Signing in...</span>
-//                 </>
-//               ) : (
-//                 <>
-//                   <span>Sign in</span>
-//                   <ArrowRight className="w-4 h-4" />
-//                 </>
-//               )}
-//             </button>
-
-//             {/* Footer */}
-//             <div className="mt-6 text-center space-y-2">
-//               <p className="text-xs text-gray-400 tracking-wide">
-//                 © 2026 All rights reserved
-//               </p>
-//               <p className="text-[11px] text-gray-400 tracking-wide">
-//                 System and Software generated by{' '}
-//                 <span className="font-medium text-[#0071BD]">Muhammad Hassan Jaffer</span>
-//               </p>
-//             </div>
-//           </form>
+//         {/* Right Side - Full Illustration Image (PNG) */}
+//         <div className="hidden lg:block relative w-0 flex-1">
+//           <Image
+//             src="/login.png"
+//             alt="Login Illustration"
+//             fill
+//             className="object-cover"
+//             priority
+//           />
 //         </div>
+
 //       </div>
 
-//       {/* ✅ Forgot Password Modal */}
+//       {/* Forgot Password Modal */}
 //       {showForgotModal && (
 //         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
 //           <div
-//             className="absolute inset-0 bg-black bg-opacity-50"
+//             className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
 //             onClick={closeForgotModal}
 //           />
 
-//           <div className={`relative bg-white shadow-lg max-w-md w-full p-6 md:p-8 ${roboto.className}`}>
-//             <div className="mb-6">
-//               <h2 className="text-2xl font-bold text-[#0071BD] tracking-wider">
-//                 Forgot your password?
-//               </h2>
-//               <p className="text-sm text-gray-500 mt-2 tracking-wide">
-//                 Enter your registered email address and we'll send you a password reset link.
-//               </p>
-//             </div>
+//           <div className={`relative bg-white shadow-xl max-w-sm w-full p-6 transform transition-all tracking-wide ${dmSans.className}`}>
+            
+//             {/* Top-Right Cross (X) Button */}
+//             <button
+//               onClick={closeForgotModal}
+//               className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition-colors"
+//               aria-label="Close"
+//             >
+//               <X className="w-5 h-5" />
+//             </button>
 
-//             <form onSubmit={handleForgotPassword} className="space-y-5">
-//               {/* ✅ Email Field */}
-//               <div>
-//                 <label className="block text-sm font-medium text-gray-700 tracking-wide mb-2">
-//                   Email Address
-//                 </label>
-//                 <div className="relative">
-//                   <Mail className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-//                   <input
-//                     type="email"
-//                     value={forgotEmail}
-//                     onChange={(e) => setForgotEmail(e.target.value)}
-//                     className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 placeholder-gray-400"
-//                     placeholder="Enter your email address"
-//                     required
-//                     disabled={isForgotLoading}
-//                   />
+//             {/* Agar success ho gaya hai to Tick mark show karo */}
+//             {forgotSuccess ? (
+//               <div className="text-center py-4 mt-2">
+//                 <div className="flex justify-center mb-4">
+//                   <CheckCircle className="w-16 h-16 text-green-500" />
 //                 </div>
-//               </div>
-
-//               {forgotError && (
-//                 <div className="bg-red-50 border border-red-200 p-3 flex items-start gap-2">
-//                   <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-//                   <p className="text-sm text-red-700 tracking-wide">{forgotError}</p>
-//                 </div>
-//               )}
-
-//               {forgotSuccess && (
-//                 <div className="bg-green-50 border border-green-200 p-3 flex items-start gap-2">
-//                   <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-//                   <p className="text-sm text-green-700 tracking-wide">{forgotSuccess}</p>
-//                 </div>
-//               )}
-
-//               <div className="flex gap-3 pt-2">
+//                 <h2 className="text-xl font-bold text-gray-900 tracking-wider mb-2">
+//                   Email Sent!
+//                 </h2>
+//                 <p className="text-sm text-gray-600 tracking-wide mb-6">
+//                   {forgotSuccess}
+//                 </p>
 //                 <button
 //                   type="button"
 //                   onClick={closeForgotModal}
-//                   disabled={isForgotLoading}
-//                   className="flex-1 py-3 border border-gray-300 text-gray-700 hover:bg-gray-50 transition tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+//                   className="w-full py-2.5 bg-[#0071BD] text-white hover:bg-[#005a96] transition text-sm font-medium tracking-wider"
 //                 >
-//                   Cancel
-//                 </button>
-//                 <button
-//                   type="submit"
-//                   disabled={isForgotLoading}
-//                   className="flex-1 py-3 bg-[#0071BD] text-white hover:bg-[#005a96] transition flex items-center justify-center gap-2 tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-//                 >
-//                   {isForgotLoading ? (
-//                     <>
-//                       <Loader className="w-4 h-4 animate-spin" />
-//                       <span>Sending...</span>
-//                     </>
-//                   ) : (
-//                     <>
-//                       <span>Send Reset Link</span>
-//                       <ArrowRight className="w-4 h-4" />
-//                     </>
-//                   )}
+//                   Back to Login
 //                 </button>
 //               </div>
-//             </form>
+//             ) : (
+//               // Agar success nahi hua to normal form show karo
+//               <>
+//                 <div className="mb-4 mt-2">
+//                   <h2 className="text-xl font-bold text-gray-900 tracking-wider">
+//                     Forgot your password?
+//                   </h2>
+//                   <p className="text-xs text-gray-500 mt-1 tracking-wide">
+//                     Enter your registered email address and we&apos;ll send you a password reset link.
+//                   </p>
+//                 </div>
+
+//                 <form onSubmit={handleForgotPassword} className="space-y-4">
+//                   <div>
+//                     <label className="block text-sm font-medium text-gray-700 mb-1 tracking-wide">
+//                       Email Address
+//                     </label>
+//                     <div className="relative">
+//                       <Mail className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+//                       <input
+//                         type="email"
+//                         value={forgotEmail}
+//                         onChange={(e) => setForgotEmail(e.target.value)}
+//                         className="w-full pl-9 pr-4 py-2 border border-gray-300 focus:ring-1 focus:ring-[#0071BD] focus:border-[#0071BD] outline-none shadow-sm bg-white text-black placeholder-gray-400 sm:text-sm tracking-wide"
+//                         placeholder="Enter your email address"
+//                         required
+//                         disabled={isForgotLoading}
+//                       />
+//                     </div>
+//                   </div>
+
+//                   {forgotError && (
+//                     <div className="bg-red-50 border border-red-200 p-2.5 flex items-start gap-2">
+//                       <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+//                       <p className="text-xs text-red-700 tracking-wide">{forgotError}</p>
+//                     </div>
+//                   )}
+
+//                   <div className="flex gap-2 pt-1">
+//                     <button
+//                       type="button"
+//                       onClick={closeForgotModal}
+//                       disabled={isForgotLoading}
+//                       className="flex-1 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 transition text-xs font-medium disabled:opacity-50 tracking-wide"
+//                     >
+//                       Cancel
+//                     </button>
+//                     <button
+//                       type="submit"
+//                       disabled={isForgotLoading}
+//                       className="flex-1 py-2 bg-[#0071BD] text-white hover:bg-[#005a96] transition flex items-center justify-center gap-1 text-xs font-medium disabled:opacity-50 tracking-wider"
+//                     >
+//                       {isForgotLoading ? (
+//                         <>
+//                           <Loader className="w-3 h-3 animate-spin" />
+//                           <span>Sending...</span>
+//                         </>
+//                       ) : (
+//                         <span>Send Reset Link</span>
+//                       )}
+//                     </button>
+//                   </div>
+//                 </form>
+//               </>
+//             )}
 //           </div>
 //         </div>
 //       )}
@@ -763,19 +427,19 @@
 // }
 
 
-// app/employee-login/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import Image from 'next/image'
-import { Roboto } from 'next/font/google'
-import { Loader, AlertCircle, User, Lock, Building, ArrowRight, Calendar, Clock, Eye, EyeOff, Mail } from 'lucide-react'
+import { DM_Sans } from 'next/font/google'
+// X icon import kiya gaya hai
+import { Loader, AlertCircle, Eye, EyeOff, Mail, CheckCircle, X } from 'lucide-react'
+// Social Icons Import
+import { FaWhatsapp, FaYoutube, FaFacebook, FaInstagram, FaLinkedin } from 'react-icons/fa'
 
-const roboto = Roboto({
-  weight: ['100', '300', '400', '500', '700', '900'],
-  style: ['normal', 'italic'],
+const dmSans = DM_Sans({
+  weight: ['400', '500', '700'],
   subsets: ['latin'],
   display: 'swap',
 })
@@ -788,7 +452,7 @@ export default function EmployeeLoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   
-  // ✅ Forgot Password Modal States
+  // Forgot Password Modal States
   const [showForgotModal, setShowForgotModal] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotError, setForgotError] = useState('')
@@ -843,7 +507,6 @@ export default function EmployeeLoginPage() {
       }))
 
       localStorage.setItem('employeeId', data.employeeId)
-      // ✅ Save username too for email prompt
       localStorage.setItem('employeeUsername', data.username)
 
       router.push(`/dashboard/${data.employeeId}`)
@@ -856,7 +519,6 @@ export default function EmployeeLoginPage() {
     }
   }
 
-  // ✅ Forgot Password — Email based
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setForgotError('')
@@ -910,212 +572,279 @@ export default function EmployeeLoginPage() {
   }
 
   return (
-    <div className={`min-h-screen bg-gray-50 flex items-center justify-center p-4 ${roboto.className}`}>
-      <div className="max-w-md w-full">
-        {/* Logo & Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="relative w-56 h-28">
-              <Image
-                src="/logo.png"
-                alt="Company Logo"
-                fill
-                className="object-contain"
-                priority
-              />
+    <div className={`min-h-screen bg-white p-4 md:p-8 flex items-center justify-center tracking-wider ${dmSans.className}`}>
+      
+      {/* Main Card Container */}
+      <div className="w-full max-w-4xl bg-white shadow-xl border border-gray-200 overflow-hidden flex">
+        
+        {/* Left Side - Form Section (Zyaada jagah di gayi hai) */}
+        <div className="flex-[1.2] flex flex-col justify-center py-8 px-6 sm:px-10 lg:px-12">
+          <div className="mx-auto w-full max-w-xs sm:max-w-sm">
+            
+            {/* Logo */}
+            <div className="mb-8 flex items-center">
+              <div className="relative w-64 h-16">
+                <Image
+                  src="/logo.png"
+                  alt="TheCubeFactory Logo"
+                  fill
+                  className="object-contain object-left"
+                  priority
+                />
+              </div>
+            </div>
+
+            {/* Header */}
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 tracking-wider">
+                Employee Login
+              </h2>
+            </div>
+
+            <div className="mt-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                
+                {/* Username Field */}
+                <div>
+                  <label htmlFor="username" className="block text-sm font-medium text-gray-700 tracking-wide">
+                    Username
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="username"
+                      name="username"
+                      type="text"
+                      autoComplete="username"
+                      required
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="appearance-none block w-full px-3.5 py-2.5 border border-gray-300 shadow-sm placeholder-gray-400 text-black focus:outline-none focus:ring-1 focus:ring-[#0071BD] focus:border-[#0071BD] text-sm transition-colors tracking-wide"
+                      placeholder="Enter your username"
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+
+                {/* Password Field */}
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 tracking-wide">
+                    Password
+                  </label>
+                  <div className="mt-1 relative">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="appearance-none block w-full px-3.5 py-2.5 border border-gray-300 shadow-sm placeholder-gray-400 text-black focus:outline-none focus:ring-1 focus:ring-[#0071BD] focus:border-[#0071BD] text-sm pr-10 transition-colors tracking-wide"
+                      placeholder="••••••••"
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                      disabled={isLoading}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Eye className="h-4 w-4" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Forgot Password */}
+                <div className="flex justify-start">
+                  <div className="text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotModal(true)}
+                      className="font-medium text-[#0071BD] hover:text-[#005a96] hover:underline tracking-wide"
+                      disabled={isLoading}
+                    >
+                      Forgot your password?
+                    </button>
+                  </div>
+                </div>
+
+                {/* Error Message */}
+                {error && (
+                  <div className="bg-red-50 p-2.5 flex items-start gap-2 border border-red-200">
+                    <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-700 tracking-wide">{error}</p>
+                  </div>
+                )}
+
+                {/* Sign In Button */}
+                <div className="pt-6">
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full flex justify-center py-2.5 px-4 border border-transparent shadow-sm text-sm font-medium text-white bg-[#0071BD] hover:bg-[#005a96] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0071BD] transition-colors disabled:opacity-70 disabled:cursor-not-allowed tracking-wider"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin mr-2" />
+                        Signing in...
+                      </>
+                    ) : (
+                      'Sign in'
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              {/* Social Media Icons */}
+              <div className="mt-8 flex justify-center items-center gap-4">
+                <div className="h-[1px] bg-gray-300 flex-1"></div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="text-[#25D366] text-xl cursor-default">
+                    <FaWhatsapp />
+                  </div>
+                  <div className="text-[#FF0000] text-xl cursor-default">
+                    <FaYoutube />
+                  </div>
+                  <div className="text-[#1877F2] text-xl cursor-default">
+                    <FaFacebook />
+                  </div>
+                  <div className="text-[#E4405F] text-xl cursor-default">
+                    <FaInstagram />
+                  </div>
+                  <div className="text-[#0A66C2] text-xl cursor-default">
+                    <FaLinkedin />
+                  </div>
+                </div>
+                
+                <div className="h-[1px] bg-gray-300 flex-1"></div>
+              </div>
+              
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-[#0071BD] tracking-wider">
-            Employee Login
-          </h1>
         </div>
 
-        {/* Login Card */}
-        <div className="bg-white shadow-sm p-6 md:p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Username Field */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 tracking-wide mb-2">
-                Username
-              </label>
-              <div className="relative">
-                <User className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 placeholder-gray-400"
-                  placeholder="Enter your username"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-
-            {/* Password Field with Eye Button */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 tracking-wide mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 placeholder-gray-400"
-                  placeholder="Enter your password"
-                  required
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-                  disabled={isLoading}
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* ✅ Forgot Your Password Link — LEFT SIDE */}
-            <div className="flex justify-start">
-              <button
-                type="button"
-                onClick={() => setShowForgotModal(true)}
-                className="text-sm text-[#0071BD] hover:text-[#005a96] hover:underline transition tracking-wide"
-                disabled={isLoading}
-              >
-                Forgot your password?
-              </button>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 p-3 flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-700 tracking-wide">{error}</p>
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 bg-[#0071BD] text-white hover:bg-[#005a96] transition flex items-center justify-center gap-2 tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  <span>Signing in...</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign in</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-
-            {/* Footer */}
-            <div className="mt-6 text-center space-y-2">
-              <p className="text-xs text-gray-400 tracking-wide">
-                © 2026 All rights reserved
-              </p>
-              <p className="text-[11px] text-gray-400 tracking-wide">
-                System and Software generated by{' '}
-                <span className="font-medium text-[#0071BD]">Muhammad Hassan Jaffer</span>
-              </p>
-            </div>
-          </form>
+        {/* Right Side - Image Section (Choti aur fix width ki gayi hai) */}
+        <div className="hidden lg:block relative lg:w-[350px] border-l border-gray-200">
+          <Image
+            src="/login.png"
+            alt="Login Illustration"
+            fill
+            className="object-cover"
+            priority
+          />
         </div>
+
       </div>
 
-      {/* ✅ Forgot Password Modal */}
+      {/* Forgot Password Modal */}
       {showForgotModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black bg-opacity-50"
+            className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
             onClick={closeForgotModal}
           />
 
-          <div className={`relative bg-white shadow-lg max-w-md w-full p-6 md:p-8 ${roboto.className}`}>
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-[#0071BD] tracking-wider">
-                Forgot your password?
-              </h2>
-              <p className="text-sm text-gray-500 mt-2 tracking-wide">
-                Enter your registered email address and we&apos;ll send you a password reset link.
-              </p>
-            </div>
+          <div className={`relative bg-white shadow-xl max-w-sm w-full p-6 transform transition-all tracking-wide ${dmSans.className}`}>
+            
+            {/* Top-Right Cross (X) Button */}
+            <button
+              onClick={closeForgotModal}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-            <form onSubmit={handleForgotPassword} className="space-y-5">
-              {/* ✅ Email Field */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 tracking-wide mb-2">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="email"
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[#0071BD] focus:border-transparent outline-none shadow-sm bg-white text-gray-900 placeholder-gray-400"
-                    placeholder="Enter your email address"
-                    required
-                    disabled={isForgotLoading}
-                  />
+            {/* Success State */}
+            {forgotSuccess ? (
+              <div className="text-center py-4 mt-2">
+                <div className="flex justify-center mb-4">
+                  <CheckCircle className="w-16 h-16 text-green-500" />
                 </div>
-              </div>
-
-              {forgotError && (
-                <div className="bg-red-50 border border-red-200 p-3 flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-700 tracking-wide">{forgotError}</p>
-                </div>
-              )}
-
-              {forgotSuccess && (
-                <div className="bg-green-50 border border-green-200 p-3 flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-green-700 tracking-wide">{forgotSuccess}</p>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
+                <h2 className="text-xl font-bold text-gray-900 tracking-wider mb-2">
+                  Email Sent!
+                </h2>
+                <p className="text-sm text-gray-600 tracking-wide mb-6">
+                  {forgotSuccess}
+                </p>
                 <button
                   type="button"
                   onClick={closeForgotModal}
-                  disabled={isForgotLoading}
-                  className="flex-1 py-3 border border-gray-300 text-gray-700 hover:bg-gray-50 transition tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-2.5 bg-[#0071BD] text-white hover:bg-[#005a96] transition text-sm font-medium tracking-wider"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isForgotLoading}
-                  className="flex-1 py-3 bg-[#0071BD] text-white hover:bg-[#005a96] transition flex items-center justify-center gap-2 tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isForgotLoading ? (
-                    <>
-                      <Loader className="w-4 h-4 animate-spin" />
-                      <span>Sending...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Send Reset Link</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
+                  Back to Login
                 </button>
               </div>
-            </form>
+            ) : (
+              // Form State
+              <>
+                <div className="mb-4 mt-2">
+                  <h2 className="text-xl font-bold text-gray-900 tracking-wider">
+                    Forgot your password?
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-1 tracking-wide">
+                    Enter your registered email address and we&apos;ll send you a password reset link.
+                  </p>
+                </div>
+
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1 tracking-wide">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="email"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 border border-gray-300 focus:ring-1 focus:ring-[#0071BD] focus:border-[#0071BD] outline-none shadow-sm bg-white text-black placeholder-gray-400 sm:text-sm tracking-wide"
+                        placeholder="Enter your email address"
+                        required
+                        disabled={isForgotLoading}
+                      />
+                    </div>
+                  </div>
+
+                  {forgotError && (
+                    <div className="bg-red-50 border border-red-200 p-2.5 flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-red-700 tracking-wide">{forgotError}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={closeForgotModal}
+                      disabled={isForgotLoading}
+                      className="flex-1 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 transition text-xs font-medium disabled:opacity-50 tracking-wide"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isForgotLoading}
+                      className="flex-1 py-2 bg-[#0071BD] text-white hover:bg-[#005a96] transition flex items-center justify-center gap-1 text-xs font-medium disabled:opacity-50 tracking-wider"
+                    >
+                      {isForgotLoading ? (
+                        <>
+                          <Loader className="w-3 h-3 animate-spin" />
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        <span>Send Reset Link</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}
