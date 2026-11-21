@@ -16,6 +16,7 @@
     "jspdf": "^4.2.1",
     "lucide-react": "0.577.0",
     "next": "14.2.16",
+    "next-pwa": "^5.6.0",
     "nodemailer": "^10.0.13",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -26,6 +27,7 @@
     "zkteco-js": "^1.7.2"
   },
   "devDependencies": {
+    "@types/next-pwa": "^5.6.9",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^18.3.0",
