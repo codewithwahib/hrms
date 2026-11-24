@@ -61,6 +61,8 @@ interface Employee {
   source?: 'K' | 'PQ'
   enable_attendance?: boolean
   enable_site_visits?: boolean
+  used_leaves?: number | null // ✅ NEW
+  remaining_leaves?: number | null // ✅ NEW
   shift?: 'A' | 'B' | 'C' | null
   shift_timing?: string | null
   check_in?: any
@@ -136,6 +138,8 @@ interface AttendanceRecord {
   isNightShift: boolean
   lateMinutes: number
   overtimeMinutes: number
+  usedLeaves: number // ✅ NEW
+  remainingLeaves: number // ✅ NEW
 }
 
 interface MonthlySummary {
@@ -837,6 +841,8 @@ export default function GetSheetPage() {
         isNightShift: isNight,
         lateMinutes: 0,
         overtimeMinutes: 0,
+        usedLeaves: Number(employee.used_leaves ?? 0), // ✅ NEW
+        remainingLeaves: Number(employee.remaining_leaves ?? 0), // ✅ NEW
       }
     }
 
@@ -1136,6 +1142,8 @@ export default function GetSheetPage() {
       isNightShift: isNight,
       lateMinutes,
       overtimeMinutes,
+      usedLeaves: Number(employee.used_leaves ?? 0), // ✅ NEW
+      remainingLeaves: Number(employee.remaining_leaves ?? 0), // ✅ NEW
     }
   }, [formatDate, getDayName, formatTime, calculateTotalHours, calculateOutsideHours, getQualificationsString, getExperienceString, getSiteVisitsForDate, addThreeDurations, calculateSVHours])
 
@@ -2171,6 +2179,8 @@ export default function GetSheetPage() {
           <td style="padding: 2px 3px; border: 1px solid #000; font-size: 7px; text-align: center; font-weight: bold; color: #1D4ED8;">${record.totalHoursWithOS}</td>
           <td style="padding: 2px 3px; border: 1px solid #000; font-size: 7px; text-align: center;">${record.branch}</td>
           <td style="padding: 2px 3px; border: 1px solid #000; font-size: 7px; text-align: center;">${record.status}</td>
+          <td style="padding: 2px 3px; border: 1px solid #000; font-size: 7px; text-align: center;">${record.usedLeaves}</td>
+          <td style="padding: 2px 3px; border: 1px solid #000; font-size: 7px; text-align: center;">${record.remainingLeaves}</td>
           <td style="padding: 2px 3px; border: 1px solid #000; font-size: 7px; text-align: center;">${record.siteVisitCount > 0 ? record.siteVisitCount : '-'}</td>
           <td style="padding: 2px 3px; border: 1px solid #000; font-size: 6px; text-align: left; max-width: 150px; word-break: break-word;">${record.siteVisitDetails}</td>
         </tr>
@@ -2229,8 +2239,10 @@ export default function GetSheetPage() {
                   <th style="width:4%">Total Hours</th>
                   <th style="width:4%">Company</th>
                   <th style="width:3%">Status</th>
+                  <th style="width:2%">Used Lv</th>
+                  <th style="width:2%">Rem Lv</th>
                   <th style="width:2%">SV</th>
-                  <th style="width:15%">Site Visits (Company - From - To)</th>
+                  <th style="width:13%">Site Visits (Company - From - To)</th>
                 </tr>
               </thead>
               <tbody>${tableRows}</tbody>
